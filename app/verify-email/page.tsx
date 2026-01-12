@@ -1,5 +1,8 @@
 "use client"
 
+// Disable static prerender to avoid Suspense requirement with useSearchParams
+export const dynamic = "force-dynamic"
+
 import { useEffect, useState } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
