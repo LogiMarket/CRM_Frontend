@@ -2,7 +2,6 @@
 
 // Disable static prerender to avoid Suspense requirement with useSearchParams
 export const dynamic = "force-dynamic"
-export const revalidate = 0
 
 import type React from "react"
 import Link from "next/link"
