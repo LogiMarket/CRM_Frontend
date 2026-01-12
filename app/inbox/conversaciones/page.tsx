@@ -1,0 +1,61 @@
+"use client"
+
+import { useState } from "react"
+import { InboxHeader } from "@/components/inbox-header"
+import { ConversationList } from "@/components/conversation-list"
+import { ChatArea } from "@/components/chat-area"
+import { OrdersPanel } from "@/components/orders-panel"
+
+export default function ConversacionesPage() {
+  const [selectedConversationId, setSelectedConversationId] = useState<number>()
+  const [selectedContactName, setSelectedContactName] = useState<string>()
+  const [selectedContactId, setSelectedContactId] = useState<number>()
+  const [currentAgentId, setCurrentAgentId] = useState<number>()
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const handleSelectConversation = (id: number) => {
+    setSelectedConversationId(id)
+    fetch(`/api/conversations`)
+      .then((res) => res.json())
+      .then((data) => {
+        const conv = data.conversations.find((c: any) => c.id === id)
+        if (conv) {
+          setSelectedContactName(conv.contact_name)
+          setSelectedContactId(conv.contact_id)
+          setCurrentAgentId(conv.assigned_agent_id)
+        }
+      })
+  }
+
+  const handleUpdate = () => {
+    setRefreshKey((prev) => prev + 1)
+  }
+
+  return (
+    <>
+      <InboxHeader />
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex h-full w-96 flex-col border-r border-border bg-card">
+          <ConversationList
+            key={refreshKey}
+            selectedId={selectedConversationId}
+            onSelectConversation={handleSelectConversation}
+          />
+        </div>
+
+        <div className="flex flex-1 flex-col">
+          <ChatArea
+            conversationId={selectedConversationId}
+            contactName={selectedContactName}
+            currentAgentId={currentAgentId}
+            onUpdate={handleUpdate}
+          />
+        </div>
+
+        <div className="flex h-full w-96 flex-col border-l border-border bg-card">
+          <OrdersPanel contactId={selectedContactId} />
+        </div>
+      </div>
+    </>
+  )
+}
