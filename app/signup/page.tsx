@@ -16,6 +16,7 @@ export default function SignupPage() {
   const [name, setName] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
+  const [verificationSent, setVerificationSent] = useState(false)
   const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,17 +39,15 @@ export default function SignupPage() {
         return
       }
 
-      // Auto login after signup
-      const loginResponse = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      })
-
-      if (loginResponse.ok) {
-        router.push("/inbox")
+      // Check if email verification is required
+      if (data.requiresVerification) {
+        setVerificationSent(true)
+        setLoading(false)
       } else {
-        router.push("/login")
+        // No verification required (demo mode)
+        // Show success message and redirect to login
+        setLoading(false)
+        router.push("/login?message=signup-success")
       }
     } catch (err) {
       setError("An error occurred. Please try again.")
@@ -85,103 +84,159 @@ export default function SignupPage() {
             <h2 className="text-2xl font-bold">Inbox Compartido</h2>
           </div>
 
-          <div className="space-y-6">
-            <div className="space-y-2 text-center lg:text-left">
-              <h2 className="text-3xl font-bold tracking-tight">Crear cuenta</h2>
-              <p className="text-muted-foreground">Completa el formulario para registrarte como agente</p>
-            </div>
-
-            <form onSubmit={handleSubmit} className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium">
-                  Nombre completo
-                </Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Juan Pérez"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="pl-10 h-11"
-                  />
-                </div>
+          {verificationSent ? (
+            // Verification message
+            <div className="space-y-6 text-center">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-green-100 text-green-600 mx-auto">
+                <Mail className="w-8 h-8" />
+              </div>
+              <div className="space-y-3">
+                <h2 className="text-3xl font-bold tracking-tight">Verifica tu correo</h2>
+                <p className="text-muted-foreground">
+                  Hemos enviado un enlace de verificación a{" "}
+                  <span className="font-semibold text-foreground">{email}</span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Por favor revisa tu correo (incluyendo la carpeta de spam) y haz clic en el enlace de verificación.
+                </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium">
-                  Correo electrónico
-                </Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="tu@empresa.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="pl-10 h-11"
-                  />
-                </div>
-              </div>
+              <Button
+                onClick={async () => {
+                  setLoading(true)
+                  try {
+                    const response = await fetch("/api/auth/resend-verification", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ email }),
+                    })
 
-              <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Contraseña
-                </Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="Mínimo 6 caracteres"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    disabled={loading}
-                    className="pl-10 h-11"
-                    minLength={6}
-                  />
-                </div>
-              </div>
+                    const data = await response.json()
 
-              {error && (
-                <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive flex items-start gap-2">
-                  <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  <span>{error}</span>
-                </div>
-              )}
-
-              <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
-                {loading ? (
-                  <div className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
-                    Creando cuenta...
-                  </div>
-                ) : (
-                  "Crear cuenta"
-                )}
+                    if (response.ok) {
+                      alert("Se ha reenviado el correo de verificación a " + email)
+                    } else {
+                      setError(data.error || "Error al reenviar el correo")
+                    }
+                  } catch (err) {
+                    setError("Error al reenviar el correo")
+                  }
+                  setLoading(false)
+                }}
+                variant="outline"
+                className="w-full"
+                disabled={loading}
+              >
+                {loading ? "Reenviando..." : "Reenviar correo de verificación"}
               </Button>
-            </form>
 
-            <div className="text-center text-sm">
-              <span className="text-muted-foreground">¿Ya tienes cuenta? </span>
-              <Link href="/login" className="text-primary hover:underline font-medium">
-                Inicia sesión
-              </Link>
+              <div className="text-center text-sm">
+                <span className="text-muted-foreground">¿Ya verificaste tu correo? </span>
+                <Link href="/login" className="text-primary hover:underline font-medium">
+                  Inicia sesión aquí
+                </Link>
+              </div>
             </div>
-          </div>
+          ) : (
+            // Signup form
+            <div className="space-y-6">
+              <div className="space-y-2 text-center lg:text-left">
+                <h2 className="text-3xl font-bold tracking-tight">Crear cuenta</h2>
+                <p className="text-muted-foreground">Completa el formulario para registrarte como agente</p>
+              </div>
+
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-sm font-medium">
+                    Nombre completo
+                  </Label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="name"
+                      type="text"
+                      placeholder="Juan Pérez"
+                      value={name}
+                      onChange={(e) => setName(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="pl-10 h-11"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium">
+                    Correo electrónico
+                  </Label>
+                  <div className="relative">
+                    <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="tu@empresa.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="pl-10 h-11"
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-medium">
+                    Contraseña
+                  </Label>
+                  <div className="relative">
+                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+                    <Input
+                      id="password"
+                      type="password"
+                      placeholder="Mínimo 6 caracteres"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      disabled={loading}
+                      className="pl-10 h-11"
+                      minLength={6}
+                    />
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive flex items-start gap-2">
+                    <svg className="w-5 h-5 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <span>{error}</span>
+                  </div>
+                )}
+
+                <Button type="submit" className="w-full h-11 text-base" disabled={loading}>
+                  {loading ? (
+                    <div className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-primary-foreground/30 border-t-primary-foreground rounded-full animate-spin" />
+                      Creando cuenta...
+                    </div>
+                  ) : (
+                    "Crear cuenta"
+                  )}
+                </Button>
+              </form>
+
+              <div className="text-center text-sm">
+                <span className="text-muted-foreground">¿Ya tienes cuenta? </span>
+                <Link href="/login" className="text-primary hover:underline font-medium">
+                  Inicia sesión
+                </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
