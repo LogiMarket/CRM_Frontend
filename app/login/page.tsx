@@ -74,7 +74,7 @@ function LoginForm() {
                 priority
               />
             </div>
-            <h1 className="text-4xl font-bold mb-4 text-balance animate-fade-in-up">Inbox Compartido de WhatsApp</h1>
+            <h1 className="text-4xl font-bold mb-4 text-balance animate-fade-in-up">CRM de Whatshapp - Ecommerce</h1>
             <p className="text-lg text-white/90 leading-relaxed text-pretty animate-fade-in-up delay-100">
               Gestiona conversaciones, órdenes y asignaciones de tu equipo en un solo lugar. Mensajería y logística
               especializada en e-commerce.
@@ -117,7 +117,7 @@ function LoginForm() {
               height={60}
               className="h-auto w-48 mx-auto mb-4"
             />
-            <h2 className="text-xl font-bold text-muted-foreground">Inbox Compartido</h2>
+            <h2 className="text-xl font-bold text-muted-foreground">CRM de Whatshapp - Ecommerce</h2>
           </div>
 
           <div className="space-y-6">
@@ -218,13 +218,9 @@ function LoginForm() {
             </div>
 
             <div className="text-center text-sm text-muted-foreground">
-              <p>Para usar con Railway Postgres, agrega la variable</p>
-              <p className="mt-1">
-                <code className="px-2 py-1 bg-muted rounded text-xs">DATABASE_URL</code> en las variables de entorno
-              </p>
-              <p className="mt-2 text-xs">
-                Credenciales demo: <span className="font-mono">admin@demo.com</span> /{" "}
-                <span className="font-mono">demo123</span>
+              <p className="font-semibold text-foreground mb-2">Mensajería y logística especializada en eCommerce</p>
+              <p className="text-xs">
+                Si vendes por internet, seremos tus mejores aliados para distribuir y entregar tus productos en la puerta de tus clientes.
               </p>
             </div>
 

@@ -81,7 +81,7 @@ export default function SignupPage() {
             <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary text-primary-foreground mb-4">
               <MessageSquare className="w-6 h-6" />
             </div>
-            <h2 className="text-2xl font-bold">Inbox Compartido</h2>
+            <h2 className="text-2xl font-bold">CRM de Whatshapp - Ecommerce</h2>
           </div>
 
           {verificationSent ? (
