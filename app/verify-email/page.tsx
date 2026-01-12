@@ -1,9 +1,6 @@
 "use client"
 
-// Disable static prerender to avoid Suspense requirement with useSearchParams
-export const dynamic = "force-dynamic"
-
-import { useEffect, useState } from "react"
+import { useEffect, useState, Suspense } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
@@ -11,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { MessageSquare, Mail, CheckCircle, AlertCircle } from "lucide-react"
 
-export default function VerifyEmailPage() {
+function VerifyEmailForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [code, setCode] = useState("")
@@ -248,5 +245,13 @@ export default function VerifyEmailPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function VerifyEmailPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center">Cargando...</div>}>
+      <VerifyEmailForm />
+    </Suspense>
   )
 }
