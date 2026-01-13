@@ -38,7 +38,15 @@ export function useAgents() {
       }
 
       const data = await response.json()
-      setAgents(data)
+      const mapped: Agent[] = (data || []).map((u: any) => ({
+        id: u.id,
+        name: u.name || u.full_name || u.email,
+        email: u.email,
+        role: u.role?.name === 'Administrador' ? 'admin' : 'agent',
+        status: (u.status as any) || 'offline',
+        created_at: u.created_at,
+      }))
+      setAgents(mapped)
       setError(null)
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred")
