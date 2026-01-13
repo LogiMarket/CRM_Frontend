@@ -46,7 +46,7 @@ export function AssignAgentDialog({ conversationId, currentAgentId, onAssign }: 
         return
       }
 
-      const response = await fetch(`${backendUrl}/conversations/${conversationId}/assign`, {
+      const response = await fetch(`${backendUrl}/api/conversations/${conversationId}/assign`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

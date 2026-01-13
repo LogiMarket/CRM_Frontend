@@ -27,7 +27,7 @@ export function useAgents() {
         return
       }
 
-      const response = await fetch(`${BACKEND_URL}/users/agents`, {
+      const response = await fetch(`${BACKEND_URL}/api/users/agents`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
