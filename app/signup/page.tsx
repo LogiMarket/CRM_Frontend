@@ -25,7 +25,9 @@ export default function SignupPage() {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/auth/signup", {
+      // Call backend NestJS instead of frontend endpoint
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+      const response = await fetch(`${backendUrl}/api/auth/signup`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password, name }),
@@ -39,16 +41,9 @@ export default function SignupPage() {
         return
       }
 
-      // Check if email verification is required
-      if (data.requiresVerification) {
-        setVerificationSent(true)
-        setLoading(false)
-      } else {
-        // No verification required (demo mode)
-        // Show success message and redirect to login
-        setLoading(false)
-        router.push("/login?message=signup-success")
-      }
+      // Show success message and redirect to login
+      setLoading(false)
+      router.push("/login?message=signup-success")
     } catch (err) {
       setError("An error occurred. Please try again.")
       setLoading(false)

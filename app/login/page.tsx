@@ -38,7 +38,9 @@ function LoginForm() {
     setLoading(true)
 
     try {
-      const response = await fetch("/api/auth/login", {
+      // Call backend NestJS instead of frontend endpoint
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
+      const response = await fetch(`${backendUrl}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),
@@ -52,6 +54,8 @@ function LoginForm() {
         return
       }
 
+      // Store token
+      localStorage.setItem("access_token", data.access_token)
       router.push("/inbox")
     } catch (err) {
       setError("An error occurred. Please try again.")
