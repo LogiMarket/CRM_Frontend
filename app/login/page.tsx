@@ -53,14 +53,11 @@ function LoginForm() {
         return
       }
 
-      // Store token in both localStorage and cookies
-      if (typeof window !== 'undefined') {
+      // Store token and force redirect
+      if (typeof window !== "undefined") {
         localStorage.setItem("access_token", data.access_token)
-        // Also store in cookie for middleware
-        document.cookie = `access_token=${data.access_token}; path=/`
+        window.location.href = "/inbox"
       }
-      setLoading(false)
-      router.push("/inbox")
     } catch (err) {
       console.error("Login error:", err)
       setError("An error occurred. Please try again.")
