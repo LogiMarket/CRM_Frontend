@@ -38,7 +38,6 @@ function LoginForm() {
     setLoading(true)
 
     try {
-      // Call backend NestJS instead of frontend endpoint
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:3001"
       const response = await fetch(`${backendUrl}/api/auth/login`, {
         method: "POST",
@@ -54,8 +53,10 @@ function LoginForm() {
         return
       }
 
-      // Store token and redirect
-      localStorage.setItem("access_token", data.access_token)
+      // Store token - only on client side
+      if (typeof window !== 'undefined') {
+        localStorage.setItem("access_token", data.access_token)
+      }
       setLoading(false)
       router.push("/inbox")
     } catch (err) {
