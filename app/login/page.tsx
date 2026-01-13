@@ -53,9 +53,25 @@ function LoginForm() {
         return
       }
 
-      // Store token and force redirect
+      // Construir un usuario mínimo para la sesión
+      const userPayload = {
+        id: data.user?.id ?? 0,
+        email,
+        name: data.user?.name ?? email,
+        role: data.user?.role ?? "agent",
+        status: data.user?.status ?? "available",
+      }
+
+      // Guardar token y crear cookie de sesión en el servidor
       if (typeof window !== "undefined") {
         localStorage.setItem("access_token", data.access_token)
+
+        await fetch("/api/auth/session", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ user: userPayload }),
+        })
+
         window.location.href = "/inbox"
       }
     } catch (err) {
