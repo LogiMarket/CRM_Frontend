@@ -28,7 +28,7 @@ export function useUserRole() {
           return
         }
 
-        const response = await fetch(`${backendUrl}/api/auth/me`, {
+        const response = await fetch(`${backendUrl}/auth/me`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },

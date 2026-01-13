@@ -60,7 +60,7 @@ export function useConversations(onlyAssigned?: boolean) {
         return
       }
 
-      const response = await fetch(`${BACKEND_URL}/api/conversations`, {
+      const response = await fetch(`${BACKEND_URL}/conversations`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
