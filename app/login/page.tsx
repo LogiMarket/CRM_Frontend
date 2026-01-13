@@ -54,10 +54,12 @@ function LoginForm() {
         return
       }
 
-      // Store token
+      // Store token and redirect
       localStorage.setItem("access_token", data.access_token)
+      setLoading(false)
       router.push("/inbox")
     } catch (err) {
+      console.error("Login error:", err)
       setError("An error occurred. Please try again.")
       setLoading(false)
     }
