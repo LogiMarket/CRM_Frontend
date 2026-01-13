@@ -39,11 +39,24 @@ export function useUserRole() {
         }
 
         const data = await response.json()
+        
+        // Mapear roles españoles a inglés
+        const roleMap: Record<string, UserRole> = {
+          "Administrador": "admin",
+          "Supervisor": "supervisor",
+          "Agente": "agent",
+          "admin": "admin",
+          "supervisor": "supervisor",
+          "agent": "agent"
+        }
+        
+        const mappedRole = roleMap[data.role] || "agent"
+        
         setUser({
           id: data.id,
           email: data.email,
           name: data.name,
-          role: (data.role || "agent") as UserRole,
+          role: mappedRole,
         })
         setError(null)
       } catch (err) {
