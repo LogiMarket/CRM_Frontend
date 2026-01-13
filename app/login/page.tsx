@@ -53,9 +53,11 @@ function LoginForm() {
         return
       }
 
-      // Store token - only on client side
+      // Store token in both localStorage and cookies
       if (typeof window !== 'undefined') {
         localStorage.setItem("access_token", data.access_token)
+        // Also store in cookie for middleware
+        document.cookie = `access_token=${data.access_token}; path=/`
       }
       setLoading(false)
       router.push("/inbox")
