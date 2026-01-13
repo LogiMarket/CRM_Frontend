@@ -1,10 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { InboxHeader } from "@/components/inbox-header"
 import { ConversationList } from "@/components/conversation-list"
 import { ChatArea } from "@/components/chat-area"
 import { OrdersPanel } from "@/components/orders-panel"
+import { useUserRole } from "@/hooks/use-user-role"
 
 export default function ConversacionesPage() {
   const [selectedConversationId, setSelectedConversationId] = useState<number>()
@@ -12,6 +13,10 @@ export default function ConversacionesPage() {
   const [selectedContactId, setSelectedContactId] = useState<number>()
   const [currentAgentId, setCurrentAgentId] = useState<number>()
   const [refreshKey, setRefreshKey] = useState(0)
+  const { role } = useUserRole()
+  
+  // Agentes solo ven conversaciones asignadas
+  const onlyAssigned = role === "agent"
 
   const handleSelectConversation = (id: number) => {
     setSelectedConversationId(id)
@@ -40,6 +45,7 @@ export default function ConversacionesPage() {
             key={refreshKey}
             selectedId={selectedConversationId}
             onSelectConversation={handleSelectConversation}
+            onlyAssigned={onlyAssigned}
           />
         </div>
 

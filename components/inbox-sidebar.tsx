@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils"
 import { useState } from "react"
 import { useRouter, usePathname } from "next/navigation"
 import Image from "next/image"
+import { useUserRole } from "@/hooks/use-user-role"
 
 interface InboxSidebarProps {
   user: {
@@ -21,6 +22,7 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
   const router = useRouter()
   const pathname = usePathname()
+  const { isAdminOrSupervisor } = useUserRole()
 
   const handleLogout = async () => {
     await fetch("/api/auth/logout", { method: "POST" })
@@ -77,20 +79,25 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
           <MessageSquare className="h-5 w-5" />
           {!collapsed && <span className="ml-3">Conversaciones</span>}
         </Button>
-        <Button
-          variant="ghost"
-          onClick={() => router.push("/inbox/agentes")}
-          className={cn(
-            "w-full justify-start transition-colors",
-            collapsed && "justify-center px-2",
-            isAgentes
-              ? "bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
-              : "text-foreground hover:bg-sidebar-accent hover:text-foreground",
-          )}
-        >
-          <Users className="h-5 w-5" />
-          {!collapsed && <span className="ml-3">Agentes</span>}
-        </Button>
+        
+        {/* Agentes tab - solo visible para admin y supervisor */}
+        {isAdminOrSupervisor && (
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/inbox/agentes")}
+            className={cn(
+              "w-full justify-start transition-colors",
+              collapsed && "justify-center px-2",
+              isAgentes
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
+                : "text-foreground hover:bg-sidebar-accent hover:text-foreground",
+            )}
+          >
+            <Users className="h-5 w-5" />
+            {!collapsed && <span className="ml-3">Agentes</span>}
+          </Button>
+        )}
+        
         <Button
           variant="ghost"
           onClick={() => router.push("/inbox/configuracion")}

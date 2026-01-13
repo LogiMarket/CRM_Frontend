@@ -7,6 +7,8 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
+import { useConversations } from "@/hooks/use-conversations"
+import { RefreshCw } from "lucide-react"
 
 interface Conversation {
   id: number
@@ -24,27 +26,25 @@ interface Conversation {
 interface ConversationListProps {
   selectedId?: number
   onSelectConversation: (id: number) => void
+  onlyAssigned?: boolean
 }
 
-export function ConversationList({ selectedId, onSelectConversation }: ConversationListProps) {
-  const [conversations, setConversations] = useState<Conversation[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    fetchConversations()
-  }, [])
-
-  const fetchConversations = async () => {
-    try {
-      const response = await fetch("/api/conversations")
-      const data = await response.json()
-      setConversations(data.conversations || [])
-    } catch (error) {
-      console.error("[v0] Fetch conversations error:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
+export function ConversationList({ selectedId, onSelectConversation, onlyAssigned }: ConversationListProps) {
+  const { conversations: backendConversations, loading, refreshing, error } = useConversations(onlyAssigned)
+  
+  // Transform backend data to component format
+  const conversations = backendConversations.map(conv => ({
+    id: parseInt(conv.id),
+    contact_name: conv.customer_name,
+    phone_number: conv.customer_phone,
+    contact_avatar: undefined,
+    last_message: conv.last_message?.content || "Sin mensajes",
+    last_message_at: conv.last_message?.created_at || conv.created_at,
+    unread_count: conv.unread_count,
+    status: conv.status,
+    priority: conv.priority,
+    agent_name: undefined, // TODO: fetch from assigned_agent_id
+  }))
 
   const getInitials = (name: string) => {
     return name
@@ -78,9 +78,32 @@ export function ConversationList({ selectedId, onSelectConversation }: Conversat
     )
   }
 
+  if (error) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <p className="text-red-500 text-sm text-center">{error}</p>
+      </div>
+    )
+  }
+
+  if (conversations.length === 0) {
+    return (
+      <div className="flex h-full items-center justify-center p-4">
+        <p className="text-muted-foreground text-sm text-center">No hay conversaciones</p>
+      </div>
+    )
+  }
+
   return (
-    <ScrollArea className="h-full">
-      <div className="space-y-1 p-2">
+    <div className="h-full flex flex-col">
+      {refreshing && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800">
+          <RefreshCw className="h-3 w-3 animate-spin text-blue-600 dark:text-blue-400" />
+          <span className="text-xs text-blue-700 dark:text-blue-300">Actualizando conversaciones...</span>
+        </div>
+      )}
+      <ScrollArea className="flex-1">
+        <div className="space-y-1 p-2">
         {conversations.map((conv) => (
           <button
             key={conv.id}
@@ -129,6 +152,7 @@ export function ConversationList({ selectedId, onSelectConversation }: Conversat
           </button>
         ))}
       </div>
-    </ScrollArea>
+      </ScrollArea>
+    </div>
   )
 }

@@ -23,9 +23,9 @@ interface Message {
 }
 
 interface ChatAreaProps {
-  conversationId?: number
+  conversationId?: number | string
   contactName?: string
-  currentAgentId?: number
+  currentAgentId?: number | string
   onUpdate?: () => void
 }
 
@@ -133,8 +133,8 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
         <div className="flex items-center gap-2">
           {conversationId && (
             <AssignAgentDialog
-              conversationId={conversationId}
-              currentAgentId={currentAgentId}
+              conversationId={conversationId.toString()}
+              currentAgentId={currentAgentId?.toString()}
               onAssign={() => onUpdate?.()}
             />
           )}

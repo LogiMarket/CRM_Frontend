@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -14,57 +14,56 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { UserPlus } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { useAgents } from "@/hooks/use-agents"
 
 interface Agent {
-  id: number
+  id: string
   name: string
   email: string
-  status: string
-  avatar_url?: string
+  status?: string
+  role: "agent" | "admin"
 }
 
 interface AssignAgentDialogProps {
-  conversationId: number
-  currentAgentId?: number
+  conversationId: string
+  currentAgentId?: string
   onAssign: () => void
 }
 
 export function AssignAgentDialog({ conversationId, currentAgentId, onAssign }: AssignAgentDialogProps) {
   const [open, setOpen] = useState(false)
-  const [agents, setAgents] = useState<Agent[]>([])
   const [loading, setLoading] = useState(false)
+  const { agents, loading: loadingAgents } = useAgents()
 
-  useEffect(() => {
-    if (open) {
-      fetchAgents()
-    }
-  }, [open])
-
-  const fetchAgents = async () => {
-    try {
-      const response = await fetch("/api/users/agents")
-      const data = await response.json()
-      setAgents(data.agents || [])
-    } catch (error) {
-      console.error("[v0] Fetch agents error:", error)
-    }
-  }
-
-  const handleAssign = async (agentId: number) => {
+  const handleAssign = async (agentId: string) => {
     setLoading(true)
     try {
-      const response = await fetch(`/api/conversations/${conversationId}/assign`, {
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://crmbackend-production-4e4d.up.railway.app"
+      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
+      
+      if (!token) {
+        console.error("No authentication token found")
+        return
+      }
+
+      const response = await fetch(`${backendUrl}/api/conversations/${conversationId}/assign`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ agentId }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ agent_id: agentId }),
       })
 
       if (response.ok) {
         onAssign()
         setOpen(false)
+      } else {
+        const error = await response.json()
+        console.error("Assign error:", error)
       }
     } catch (error) {
-      console.error("[v0] Assign agent error:", error)
+      console.error("Assign agent error:", error)
     } finally {
       setLoading(false)
     }
@@ -115,41 +114,55 @@ export function AssignAgentDialog({ conversationId, currentAgentId, onAssign }: 
           <DialogDescription>Selecciona un agente para asignar esta conversación</DialogDescription>
         </DialogHeader>
 
-        <ScrollArea className="h-96">
-          <div className="space-y-2">
-            {agents.map((agent) => (
-              <button
-                key={agent.id}
-                onClick={() => handleAssign(agent.id)}
-                disabled={loading || agent.id === currentAgentId}
-                className="w-full rounded-lg border border-border bg-card p-4 text-left transition-colors hover:bg-accent disabled:opacity-50"
-              >
-                <div className="flex items-center gap-3">
-                  <div className="relative">
-                    <Avatar className="h-12 w-12">
-                      <AvatarFallback className="bg-primary text-primary-foreground">
-                        {getInitials(agent.name)}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div
-                      className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${getStatusColor(agent.status)}`}
-                    />
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-semibold text-sm">{agent.name}</h3>
-                      {agent.id === currentAgentId && <Badge variant="secondary">Asignado</Badge>}
-                    </div>
-                    <p className="text-muted-foreground text-xs">{agent.email}</p>
-                    <Badge variant="outline" className="mt-1 text-xs">
-                      {getStatusLabel(agent.status)}
-                    </Badge>
-                  </div>
-                </div>
-              </button>
-            ))}
+        {loadingAgents ? (
+          <div className="flex items-center justify-center py-8">
+            <p className="text-sm text-muted-foreground">Cargando agentes...</p>
           </div>
-        </ScrollArea>
+        ) : agents.length === 0 ? (
+          <div className="flex items-center justify-center py-8">
+            <p className="text-sm text-muted-foreground">No hay agentes disponibles</p>
+          </div>
+        ) : (
+          <ScrollArea className="h-96">
+            <div className="space-y-2">
+              {agents.map((agent) => (
+                <button
+                  key={agent.id}
+                  onClick={() => handleAssign(agent.id)}
+                  disabled={loading || agent.id === currentAgentId}
+                  className="w-full rounded-lg border border-border bg-card p-4 text-left transition-colors hover:bg-accent disabled:opacity-50"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Avatar className="h-12 w-12">
+                        <AvatarFallback className="bg-primary text-primary-foreground">
+                          {getInitials(agent.name)}
+                        </AvatarFallback>
+                      </Avatar>
+                      {agent.status && (
+                        <div
+                          className={`absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white ${getStatusColor(agent.status)}`}
+                        />
+                      )}
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <h3 className="font-semibold text-sm">{agent.name}</h3>
+                        {agent.id === currentAgentId && <Badge variant="secondary">Asignado</Badge>}
+                      </div>
+                      <p className="text-muted-foreground text-xs">{agent.email}</p>
+                      {agent.status && (
+                        <Badge variant="outline" className="mt-1 text-xs">
+                          {getStatusLabel(agent.status)}
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+        )}
       </DialogContent>
     </Dialog>
   )
