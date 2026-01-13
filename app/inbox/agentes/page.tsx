@@ -6,10 +6,10 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Users, MessageSquare, TrendingUp, Mail, ChevronDown, ChevronUp, Clock, CheckCircle2 } from "lucide-react"
-import { DEMO_DATA } from "@/lib/demo-data"
 import { InboxHeader } from "@/components/inbox-header"
 import { AddAgentDialog } from "@/components/add-agent-dialog"
 import { useUserRole } from "@/hooks/use-user-role"
+import { useAgents } from "@/hooks/use-agents"
 import { useRouter } from "next/navigation"
 
 export default function AgentesPage() {
@@ -40,22 +40,17 @@ export default function AgentesPage() {
       </>
     )
   }
-  // Get agents from demo data
-  const agents = DEMO_DATA.users.filter((u) => u.role === "agent" || u.role === "admin")
+  // Fetch agents from backend
+  const { agents, loading: loadingAgents, error } = useAgents()
 
   // Calculate stats per agent
-  const agentStats = agents.map((agent) => {
-    const assignedConversations = DEMO_DATA.conversations.filter((c) => c.assigned_to === agent.id)
-    const closedConversations = assignedConversations.filter((c) => c.status === "closed")
-
-    return {
-      ...agent,
-      totalConversations: assignedConversations.length,
-      closedConversations: closedConversations.length,
-      activeConversations: assignedConversations.length - closedConversations.length,
-      conversations: assignedConversations,
-    }
-  })
+  const agentStats = agents.map((agent) => ({
+    ...agent,
+    totalConversations: 0,
+    closedConversations: 0,
+    activeConversations: 0,
+    conversations: [],
+  }))
 
   const toggleAgentDetails = (agentId: number) => {
     setExpandedAgentId(expandedAgentId === agentId ? null : agentId)
@@ -83,9 +78,9 @@ export default function AgentesPage() {
                 <Users className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">{agents.length}</div>
+                <div className="text-2xl font-bold">{loadingAgents ? "-" : agents.length}</div>
                 <p className="text-xs text-muted-foreground">
-                  {agents.filter((a) => a.status === "online").length} en línea
+                  {loadingAgents ? "-" : agents.filter((a) => a.status === "available").length} en línea
                 </p>
               </CardContent>
             </Card>
@@ -96,9 +91,7 @@ export default function AgentesPage() {
                 <MessageSquare className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold">
-                  {agentStats.reduce((sum, a) => sum + a.activeConversations, 0)}
-                </div>
+                <div className="text-2xl font-bold">{agentStats.reduce((sum, a) => sum + a.activeConversations, 0)}</div>
                 <p className="text-xs text-muted-foreground">Asignadas al equipo</p>
               </CardContent>
             </Card>
@@ -123,7 +116,13 @@ export default function AgentesPage() {
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {agentStats.map((agent) => (
+                {error && (
+                  <p className="text-sm text-destructive">Error al cargar agentes: {error}</p>
+                )}
+                {loadingAgents && !error && (
+                  <p className="text-sm text-muted-foreground">Cargando agentes...</p>
+                )}
+                {!loadingAgents && agentStats.map((agent) => (
                   <div key={agent.id} className="space-y-0">
                     <div
                       className="flex items-center justify-between rounded-lg border border-border p-4 transition-colors hover:bg-accent/50"
@@ -142,12 +141,12 @@ export default function AgentesPage() {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="font-semibold text-foreground">{agent.name}</h3>
-                            {agent.status === "online" && (
+                            {agent.status === "available" && (
                               <Badge variant="outline" className="border-blue-500 text-blue-700 bg-blue-50">
                                 En línea
                               </Badge>
                             )}
-                            {agent.status === "away" && (
+                            {agent.status === "busy" && (
                               <Badge variant="outline" className="border-amber-500 text-amber-700 bg-amber-50">
                                 Ausente
                               </Badge>
