@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "https://crmbackend-production-4e4d.up.railway.app"
 const POLL_INTERVAL = 5000 // 5 seconds
 
 export interface Message {
@@ -53,34 +52,52 @@ export function useConversations(onlyAssigned?: boolean) {
         setRefreshing(true)
       }
       
-      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
-      
-      if (!token) {
-        setError("No authentication token found")
-        return
-      }
-
-      const response = await fetch(`${BACKEND_URL}/api/conversations`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      // Fetch from local Next.js API endpoint
+      const response = await fetch(`/api/conversations`)
 
       if (!response.ok) {
-        throw new Error("Failed to fetch conversations")
+        throw new Error(`Failed to fetch conversations: ${response.status}`)
       }
 
-      let data = await response.json()
+      const rawData = await response.json()
+      console.log("[useConversations] Raw data:", rawData)
+      
+      // Map backend response format to expected Conversation interface
+      const conversationsArray = Array.isArray(rawData) ? rawData : (rawData.conversations || [])
+      
+      const mappedConversations: Conversation[] = conversationsArray.map((conv: any) => ({
+        id: String(conv.id),
+        customer_name: conv.contact_name || "Unknown",
+        customer_phone: conv.phone_number || "",
+        customer_email: undefined,
+        status: (conv.status as "open" | "assigned" | "resolved") || "open",
+        priority: (conv.priority as "low" | "medium" | "high") || "low",
+        assigned_agent_id: conv.assigned_agent_id ? String(conv.assigned_agent_id) : undefined,
+        last_message: conv.last_message ? {
+          id: "last",
+          content: conv.last_message,
+          sender_type: "customer" as const,
+          created_at: conv.last_message_at || new Date().toISOString(),
+          conversation_id: String(conv.id),
+        } : undefined,
+        unread_count: conv.unread_count || 0,
+        created_at: conv.created_at || new Date().toISOString(),
+        updated_at: conv.last_message_at || new Date().toISOString(),
+      }))
+      
+      console.log("[useConversations] Mapped conversations:", mappedConversations)
       
       // Filter conversations if onlyAssigned is true and userId is available
-      if (onlyAssigned && userId) {
-        data = data.filter((conv: Conversation) => conv.assigned_agent_id === userId)
-      }
+      const filtered = onlyAssigned && userId 
+        ? mappedConversations.filter((conv) => conv.assigned_agent_id === userId)
+        : mappedConversations
       
-      setConversations(data)
+      setConversations(filtered)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      const errorMessage = err instanceof Error ? err.message : "An error occurred"
+      console.error("[useConversations] Error:", errorMessage, err)
+      setError(errorMessage)
     } finally {
       setLoading(false)
       setRefreshing(false)

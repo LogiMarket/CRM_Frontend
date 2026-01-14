@@ -17,25 +17,29 @@ export async function GET() {
         email: u.email,
         status: u.status,
         avatar_url: u.avatar_url,
+        role: u.role,
       }))
-      return NextResponse.json({ agents })
+      return NextResponse.json(agents)
     }
 
     const agents = await sql`
       SELECT 
-        id,
-        name,
-        email,
-        status,
-        avatar_url
-      FROM users
-      WHERE role IN ('agent', 'admin')
-      ORDER BY name ASC
+        u.id,
+        u.name,
+        u.email,
+        u.status,
+        u.avatar_url,
+        r.name as role
+      FROM users u
+      LEFT JOIN roles r ON u.role_id = r.id
+      WHERE u.role_id IS NOT NULL
+      ORDER BY u.name ASC
     `
 
-    return NextResponse.json({ agents })
+    return NextResponse.json(agents)
   } catch (error) {
     console.error("[v0] Get agents error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
+}
 }

@@ -2,15 +2,13 @@
 
 import { useState, useEffect } from "react"
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_API_URL || "https://crmbackend-production-4e4d.up.railway.app"
-
 export interface Agent {
   id: string
   name: string
   email: string
-  role: "agent" | "admin"
+  role: "agent" | "admin" | "supervisor"
   status?: "available" | "busy" | "offline"
-  created_at: string
+  created_at?: string
 }
 
 export function useAgents() {
@@ -20,36 +18,39 @@ export function useAgents() {
 
   const fetchAgents = async () => {
     try {
-      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
-      
-      if (!token) {
-        setError("No authentication token found")
-        return
-      }
-
-      const response = await fetch(`${BACKEND_URL}/api/users/agents`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
+      const response = await fetch(`/api/users/agents`)
 
       if (!response.ok) {
-        throw new Error("Failed to fetch agents")
+        throw new Error(`Failed to fetch agents: ${response.status}`)
       }
 
       const data = await response.json()
-      const mapped: Agent[] = (data || []).map((u: any) => ({
-        id: u.id,
-        name: u.name || u.full_name || u.email,
-        email: u.email,
-        role: u.role?.name === 'Administrador' ? 'admin' : 'agent',
-        status: (u.status as any) || 'offline',
-        created_at: u.created_at,
-      }))
+      const mapped: Agent[] = (Array.isArray(data) ? data : data.agents || []).map((u: any) => {
+        // Normalize role from Spanish/English to English format
+        let role: "agent" | "admin" | "supervisor" = "agent"
+        const roleName = u.role?.name || u.role // Handle both object and string formats
+        
+        if (roleName === "Administrador" || roleName === "admin") {
+          role = "admin"
+        } else if (roleName === "Supervisor" || roleName === "super") {
+          role = "supervisor"
+        }
+        
+        return {
+          id: String(u.id),
+          name: u.name || u.full_name || u.email,
+          email: u.email,
+          role,
+          status: u.status || "offline",
+          created_at: u.created_at,
+        }
+      })
       setAgents(mapped)
       setError(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An error occurred")
+      const errorMessage = err instanceof Error ? err.message : "An error occurred"
+      console.error("[useAgents] Error:", errorMessage)
+      setError(errorMessage)
     } finally {
       setLoading(false)
     }
