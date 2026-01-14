@@ -10,6 +10,7 @@ import { InboxHeader } from "@/components/inbox-header"
 import { AddAgentDialog } from "@/components/add-agent-dialog"
 import { useUserRole } from "@/hooks/use-user-role"
 import { useAgents } from "@/hooks/use-agents"
+import { useAgentStats } from "@/hooks/use-agent-stats"
 import { useRouter } from "next/navigation"
 
 export default function AgentesPage() {
@@ -42,15 +43,19 @@ export default function AgentesPage() {
   }
   // Fetch agents from backend
   const { agents, loading: loadingAgents, error } = useAgents()
+  const { stats, loading: loadingStats } = useAgentStats()
 
-  // Calculate stats per agent
-  const agentStats = agents.map((agent) => ({
-    ...agent,
-    totalConversations: 0,
-    closedConversations: 0,
-    activeConversations: 0,
-    conversations: [],
-  }))
+  // Merge agents with their stats
+  const agentStats = agents.map((agent) => {
+    const stat = stats.find((s) => s.id === agent.id)
+    return {
+      ...agent,
+      totalConversations: stat?.total_conversations || 0,
+      closedConversations: stat?.resolved_conversations || 0,
+      activeConversations: stat?.active_conversations || 0,
+      conversations: [],
+    }
+  })
 
   const toggleAgentDetails = (agentId: number) => {
     setExpandedAgentId(expandedAgentId === agentId ? null : agentId)
