@@ -39,6 +39,10 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
   useEffect(() => {
     if (conversationId) {
       fetchMessages()
+
+      // Silent polling for new messages every 5s
+      const intervalId = setInterval(() => fetchMessages(), 5000)
+      return () => clearInterval(intervalId)
     }
   }, [conversationId])
 

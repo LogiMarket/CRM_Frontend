@@ -11,7 +11,7 @@ import { useConversations } from "@/hooks/use-conversations"
 import { RefreshCw } from "lucide-react"
 
 interface Conversation {
-  id: number
+  id: string
   contact_name: string
   phone_number: string
   contact_avatar?: string
@@ -24,8 +24,8 @@ interface Conversation {
 }
 
 interface ConversationListProps {
-  selectedId?: number
-  onSelectConversation: (id: number) => void
+  selectedId?: string
+  onSelectConversation: (id: string) => void
   onlyAssigned?: boolean
 }
 
@@ -34,7 +34,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
   
   // Transform backend data to component format
   const conversations = backendConversations.map(conv => ({
-    id: parseInt(conv.id),
+    id: String(conv.id),
     contact_name: conv.customer_name,
     phone_number: conv.customer_phone,
     contact_avatar: undefined,
@@ -96,12 +96,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
 
   return (
     <div className="h-full flex flex-col">
-      {refreshing && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-950/30 border-b border-blue-200 dark:border-blue-800">
-          <RefreshCw className="h-3 w-3 animate-spin text-blue-600 dark:text-blue-400" />
-          <span className="text-xs text-blue-700 dark:text-blue-300">Actualizando conversaciones...</span>
-        </div>
-      )}
+      {/* Refresh banner omitido para evitar parpadeo visible */}
       <ScrollArea className="flex-1">
         <div className="space-y-1 p-2">
         {conversations.map((conv) => (

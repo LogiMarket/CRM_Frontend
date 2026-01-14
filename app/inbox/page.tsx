@@ -7,7 +7,7 @@ import { ChatArea } from "@/components/chat-area"
 import { OrdersPanel } from "@/components/orders-panel"
 
 export default function InboxPage() {
-  const [selectedConversationId, setSelectedConversationId] = useState<number>()
+  const [selectedConversationId, setSelectedConversationId] = useState<string>()
   const [selectedContactName, setSelectedContactName] = useState<string>()
   const [selectedContactId, setSelectedContactId] = useState<number>()
   const [currentAgentId, setCurrentAgentId] = useState<number>() // Added to track assigned agent
@@ -36,7 +36,7 @@ export default function InboxPage() {
     pickFirstConversation()
   }, [selectedConversationId, refreshKey])
 
-  const handleSelectConversation = (id: number) => {
+  const handleSelectConversation = (id: string) => {
     setSelectedConversationId(id)
     // Fetch conversation details to get contact info
     fetch(`/api/conversations`)
