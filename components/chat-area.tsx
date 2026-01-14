@@ -141,7 +141,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col bg-background">
       {/* Chat Header */}
       <div className="flex h-16 items-center justify-between border-b border-border bg-card px-6">
         <div className="flex items-center gap-3">
@@ -179,8 +179,8 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1" ref={scrollRef}>
-        <div className="space-y-4 p-6">
+      <ScrollArea className="flex-1 overflow-hidden" ref={scrollRef}>
+        <div className="space-y-4 p-6 pb-24">
           {loading ? (
             <p className="text-center text-muted-foreground text-sm">Cargando mensajes...</p>
           ) : messages.length === 0 ? (
@@ -224,7 +224,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
       </ScrollArea>
 
       {/* Message Input */}
-      <div className="border-t border-border bg-card p-4">
+      <div className="border-t border-border bg-card p-4 sticky bottom-0">
         <div className="mb-2 flex gap-2">
           <MacrosDialog onSelectMacro={handleMacroSelect} />
         </div>

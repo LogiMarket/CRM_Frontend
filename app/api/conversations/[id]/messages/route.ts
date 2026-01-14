@@ -176,6 +176,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       console.error("[POST messages] Update failed (not critical):", updateError)
     }
 
+    // Optional: forward message to external backend (WhatsApp sender)
+    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL
+    if (backendUrl) {
+      try {
+        await fetch(`${backendUrl}/api/whatsapp/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ conversationId: id, content }),
+        })
+      } catch (forwardError) {
+        console.error("[POST messages] Forward to backend failed (non-blocking):", forwardError)
+      }
+    }
+
     return NextResponse.json({
       message: {
         id: message.id,
