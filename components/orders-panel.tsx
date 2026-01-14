@@ -1,103 +1,29 @@
-"use client"
-
-import { useEffect, useState } from "react"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Search, Package, Truck, CheckCircle, Clock, XCircle, Info } from "lucide-react"
-import { cn } from "@/lib/utils"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
-import { Separator } from "@/components/ui/separator"
-
-interface Order {
-  id: number
-  order_number: string
-  status: string
-  total_amount: number
-  items: any[]
-  shipping_address: string
-  created_at: string
-  contact_name: string
-  phone_number: string
-}
-
-interface ConversationDetails {
-  id: string
-  status: string
-  priority: string
-  agent_name?: string
-  created_at: string
-  last_message_at: string
-  contact_name: string
-  phone_number: string
-}
-
-interface OrdersPanelProps {
-  contactId?: number | string
-  conversationId?: string | number
-  conversationDetails?: ConversationDetails
-}
-
-export function OrdersPanel({ contactId, conversationId, conversationDetails }: OrdersPanelProps) {
-  const [orders, setOrders] = useState<Order[]>([])
-  const [search, setSearch] = useState("")
-  const [loading, setLoading] = useState(false)
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)
-
-  useEffect(() => {
-    fetchOrders()
-  }, [contactId, search])
-
-  const fetchOrders = async () => {
-    setLoading(true)
-    try {
-      const params = new URLSearchParams()
-      if (contactId) {
-        params.append("contactId", contactId.toString())
-      }
-      if (search) {
-        params.append("search", search)
-      }
-
-      const response = await fetch(`/api/orders?${params}`)
-      const data = await response.json()
-      setOrders(data.orders || [])
-
-      // Auto-select first order if contactId is provided
-      if (contactId && data.orders?.length > 0) {
-        setSelectedOrder(data.orders[0])
-      }
-    } catch (error) {
-      console.error("[v0] Fetch orders error:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "pending":
-        return <Clock className="h-4 w-4" />
-      case "processing":
-        return <Package className="h-4 w-4" />
-      case "shipped":
-        return <Truck className="h-4 w-4" />
-      case "delivered":
-        return <CheckCircle className="h-4 w-4" />
-      case "cancelled":
-        return <XCircle className="h-4 w-4" />
-      default:
-        return <Package className="h-4 w-4" />
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "pending":
-        return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700"
-      case "processing":
++"use client"
++
++import { ConversationDetails } from "@/components/conversation-details"
++
++interface OrdersPanelProps {
++  conversationDetails?: any
++  onUpdate?: () => void
++}
++
++export function OrdersPanel({ conversationDetails, onUpdate }: OrdersPanelProps) {
++  return (
++    <ConversationDetails
++      conversationId={conversationDetails?.id}
++      status={conversationDetails?.status}
++      priority={conversationDetails?.priority}
++      agent_name={conversationDetails?.agent_name}
++      created_at={conversationDetails?.created_at}
++      last_message_at={conversationDetails?.last_message_at}
++      contact_name={conversationDetails?.contact_name}
++      phone_number={conversationDetails?.phone_number}
++      onUpdate={onUpdate}
++    />
++  )
++}
++
++export default OrdersPanel
         return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-300 dark:border-blue-700"
       case "shipped":
         return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300 border-orange-300 dark:border-orange-700"

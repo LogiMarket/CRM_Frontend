@@ -16,14 +16,29 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ success: true })
     }
 
-    // Handle both UUID and integer IDs
-    await sql`
+    // Handle both UUID and integer IDs - try UUID cast first, then fallback to integer
+    let result = await sql`
       UPDATE conversations 
       SET assigned_agent_id = ${agentId}, updated_at = NOW()
-      WHERE id::text = ${id} OR id = ${Number.parseInt(id)}
+      WHERE id::text = ${id}
+      RETURNING id
     `
 
-    return NextResponse.json({ success: true, message: "Conversation assigned successfully" })
+    // If no rows affected, try as integer
+    if (result.length === 0 && !isNaN(Number(id))) {
+      result = await sql`
+        UPDATE conversations 
+        SET assigned_agent_id = ${agentId}, updated_at = NOW()
+        WHERE id = ${Number.parseInt(id)}
+        RETURNING id
+      `
+    }
+
+    if (result.length === 0) {
+      return NextResponse.json({ error: "Conversation not found", details: `No conversation with id ${id}` }, { status: 404 })
+    }
+
+    return NextResponse.json({ success: true, message: "Conversation assigned successfully", conversationId: result[0].id })
   } catch (error) {
     console.error("[Assign] Error:", error)
     return NextResponse.json({ error: "Failed to assign conversation", details: String(error) }, { status: 500 })
