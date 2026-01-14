@@ -46,9 +46,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
     }
   }, [conversationId])
 
-  useEffect(() => {
-    scrollToBottom()
-  }, [messages])
+  // No scroll automático ya que los mensajes nuevos están arriba
 
   const fetchMessages = async () => {
     if (!conversationId) return
@@ -62,7 +60,11 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
         return
       }
       
-      setMessages(data.messages || [])
+      // Invertir el orden: más reciente arriba
+      const sortedMessages = (data.messages || []).sort((a: Message, b: Message) => {
+        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      })
+      setMessages(sortedMessages)
     } catch (error) {
       console.error("[ChatArea] Fetch messages error:", error)
     }
@@ -92,9 +94,8 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
 
       const data = await response.json()
       if (data.message) {
-        // Add message to list with full data
+        // Add message to BEGINNING of list (most recent first)
         setMessages([
-          ...messages,
           {
             id: data.message.id,
             content: data.message.content,
@@ -102,6 +103,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
             sender_name: data.message.sender_name || "Agent",
             created_at: data.message.created_at || new Date().toISOString(),
           },
+          ...messages,
         ])
       }
     } catch (error) {
@@ -115,12 +117,6 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
 
   const handleMacroSelect = async (content: string, macroId: number) => {
     setNewMessage(content)
-  }
-
-  const scrollToBottom = () => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
-    }
   }
 
   const getInitials = (name: string) => {

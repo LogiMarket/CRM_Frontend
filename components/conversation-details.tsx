@@ -43,12 +43,17 @@ export function ConversationDetails({
   const [comments, setComments] = useState("")
   const [newComment, setNewComment] = useState("")
   const [currentStatus, setCurrentStatus] = useState(status)
+  const [currentPriority, setCurrentPriority] = useState(priority)
   const [loading, setLoading] = useState(false)
   const [commentsLoading, setCommentsLoading] = useState(false)
 
   useEffect(() => {
     setCurrentStatus(status)
   }, [status])
+
+  useEffect(() => {
+    setCurrentPriority(priority)
+  }, [priority])
 
   useEffect(() => {
     if (!conversationId) return
@@ -70,6 +75,7 @@ export function ConversationDetails({
 
     loadComments()
   }, [conversationId])
+  
   const handleStatusChange = async (newStatus: string) => {
     if (!conversationId) return
     
@@ -87,6 +93,28 @@ export function ConversationDetails({
       }
     } catch (error) {
       console.error("[ConversationDetails] Error updating status:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handlePriorityChange = async (newPriority: string) => {
+    if (!conversationId) return
+    
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/priority`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ priority: newPriority }),
+      })
+
+      if (response.ok) {
+        setCurrentPriority(newPriority)
+        onUpdate?.()
+      }
+    } catch (error) {
+      console.error("[ConversationDetails] Error updating priority:", error)
     } finally {
       setLoading(false)
     }
@@ -154,9 +182,18 @@ export function ConversationDetails({
                 </SelectContent>
               </Select>
 
-              <div className="flex justify-between text-xs">
-                <span className="text-muted-foreground">Prioridad:</span>
-                <Badge className="capitalize">{priority}</Badge>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs text-muted-foreground">Prioridad:</span>
+                <Select value={currentPriority} onValueChange={handlePriorityChange} disabled={loading}>
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="low">Baja</SelectItem>
+                    <SelectItem value="medium">Media</SelectItem>
+                    <SelectItem value="high">Alta</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               {agent_name && (
