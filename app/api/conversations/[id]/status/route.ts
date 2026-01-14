@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { pool } from "@/lib/db"
+import { sql } from "@/lib/db"
 
 export async function PUT(
   request: Request,
@@ -23,10 +23,8 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid status" }, { status: 400 })
     }
 
-    const sql = pool.query.bind(pool)
-
     // Try to update as UUID first, then as integer
-    let result: any = await sql`
+    let result: any = await sql!`
       UPDATE conversations 
       SET status = ${status}, updated_at = NOW()
       WHERE id::text = ${id}
@@ -34,7 +32,7 @@ export async function PUT(
     `
 
     if (result.length === 0 && !isNaN(Number(id))) {
-      result = await sql`
+      result = await sql!`
         UPDATE conversations 
         SET status = ${status}, updated_at = NOW()
         WHERE id = ${Number.parseInt(id)}

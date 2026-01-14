@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { pool } from "@/lib/db"
+import { sql } from "@/lib/db"
 
 export async function POST(
   request: Request,
@@ -18,16 +18,14 @@ export async function POST(
       return NextResponse.json({ error: "Comment required" }, { status: 400 })
     }
 
-    const sql = pool.query.bind(pool)
-
     // Get current comments
-    let conversationResult: any = await sql`
+    let conversationResult: any = await sql!`
       SELECT comments FROM conversations 
       WHERE id::text = ${id}
     `
 
     if (conversationResult.length === 0 && !isNaN(Number(id))) {
-      conversationResult = await sql`
+      conversationResult = await sql!`
         SELECT comments FROM conversations 
         WHERE id = ${Number.parseInt(id)}
       `
@@ -44,7 +42,7 @@ export async function POST(
       : `[${timestamp}]\n${comment}`
 
     // Update comments
-    let result: any = await sql`
+    let result: any = await sql!`
       UPDATE conversations 
       SET comments = ${newComments}, updated_at = NOW()
       WHERE id::text = ${id}
@@ -52,7 +50,7 @@ export async function POST(
     `
 
     if (result.length === 0 && !isNaN(Number(id))) {
-      result = await sql`
+      result = await sql!`
         UPDATE conversations 
         SET comments = ${newComments}, updated_at = NOW()
         WHERE id = ${Number.parseInt(id)}

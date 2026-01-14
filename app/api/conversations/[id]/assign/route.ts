@@ -17,7 +17,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     // Handle both UUID and integer IDs - try UUID cast first, then fallback to integer
-    let result = await sql`
+    let result = await sql!`
       UPDATE conversations 
       SET assigned_agent_id = ${agentId}, updated_at = NOW()
       WHERE id::text = ${id}
@@ -26,7 +26,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     // If no rows affected, try as integer
     if (result.length === 0 && !isNaN(Number(id))) {
-      result = await sql`
+      result = await sql!`
         UPDATE conversations 
         SET assigned_agent_id = ${agentId}, updated_at = NOW()
         WHERE id = ${Number.parseInt(id)}

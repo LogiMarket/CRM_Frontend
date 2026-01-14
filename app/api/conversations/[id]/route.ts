@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { pool } from "@/lib/db"
+import { sql } from "@/lib/db"
 
 export async function GET(
   request: Request,
@@ -12,10 +12,8 @@ export async function GET(
       return NextResponse.json({ error: "Conversation ID required" }, { status: 400 })
     }
 
-    const sql = pool.query.bind(pool)
-
     // Try UUID format first, then integer
-    let result: any = await sql`
+    let result: any = await sql!`
       SELECT 
         id, 
         status, 
@@ -31,7 +29,7 @@ export async function GET(
     `
 
     if (result.length === 0 && !isNaN(Number(id))) {
-      result = await sql`
+      result = await sql!`
         SELECT 
           id, 
           status, 
@@ -54,7 +52,7 @@ export async function GET(
     const conversation = result[0]
 
     // Fetch contact info
-    let contactResult: any = await sql`
+    let contactResult: any = await sql!`
       SELECT name, phone_number FROM contacts WHERE id = ${conversation.contact_id}
     `
 
@@ -63,7 +61,7 @@ export async function GET(
     // Fetch agent info if assigned
     let agentResult: any = []
     if (conversation.assigned_agent_id) {
-      agentResult = await sql`
+      agentResult = await sql!`
         SELECT name FROM users WHERE id = ${conversation.assigned_agent_id}
       `
     }
