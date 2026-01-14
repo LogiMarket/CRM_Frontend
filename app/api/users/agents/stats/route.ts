@@ -16,8 +16,8 @@ export async function GET() {
         u.name,
         u.email,
         r.name as role_name,
-        COUNT(c.id) FILTER (WHERE c.status IN ('open', 'assigned')) as active_count,
-        COUNT(c.id) FILTER (WHERE c.status = 'resolved') as resolved_count,
+        COUNT(c.id) FILTER (WHERE c.status::text IN ('open', 'assigned')) as active_count,
+        COUNT(c.id) FILTER (WHERE c.status::text = 'resolved') as resolved_count,
         COUNT(c.id) as total_count
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id

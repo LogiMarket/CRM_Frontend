@@ -26,17 +26,17 @@ export async function PUT(
     // Try to update as UUID first, then as integer
     let result: any = await sql!`
       UPDATE conversations 
-      SET status = ${status}, updated_at = NOW()
+      SET status = ${status}::text, updated_at = NOW()
       WHERE id::text = ${id}
-      RETURNING id, status
+      RETURNING id, status::text as status
     `
 
     if (result.length === 0 && !isNaN(Number(id))) {
       result = await sql!`
         UPDATE conversations 
-        SET status = ${status}, updated_at = NOW()
+        SET status = ${status}::text, updated_at = NOW()
         WHERE id = ${Number.parseInt(id)}
-        RETURNING id, status
+        RETURNING id, status::text as status
       `
     }
 

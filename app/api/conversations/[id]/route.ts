@@ -16,11 +16,10 @@ export async function GET(
     let result: any = await sql!`
       SELECT 
         id, 
-        status, 
+        status::text as status, 
         priority, 
         contact_id,
         assigned_agent_id,
-        comments,
         created_at, 
         last_message_at
       FROM conversations 
@@ -32,11 +31,10 @@ export async function GET(
       result = await sql!`
         SELECT 
           id, 
-          status, 
+          status::text as status, 
           priority, 
           contact_id,
           assigned_agent_id,
-          comments,
           created_at, 
           last_message_at
         FROM conversations 
@@ -72,7 +70,7 @@ export async function GET(
       id: conversation.id,
       status: conversation.status,
       priority: conversation.priority,
-      comments: conversation.comments || "",
+      comments: "",
       created_at: conversation.created_at,
       last_message_at: conversation.last_message_at,
       contact_name: contact.name,
