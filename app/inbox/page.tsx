@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { InboxHeader } from "@/components/inbox-header"
 import { ConversationList } from "@/components/conversation-list"
 import { ChatArea } from "@/components/chat-area"
@@ -12,6 +12,29 @@ export default function InboxPage() {
   const [selectedContactId, setSelectedContactId] = useState<number>()
   const [currentAgentId, setCurrentAgentId] = useState<number>() // Added to track assigned agent
   const [refreshKey, setRefreshKey] = useState(0) // Added to force refresh
+
+  // Auto-seleccionar la primera conversación disponible
+  useEffect(() => {
+    if (selectedConversationId) return
+
+    const pickFirstConversation = async () => {
+      try {
+        const res = await fetch("/api/conversations")
+        const data = await res.json()
+        const first = data.conversations?.[0]
+        if (first) {
+          setSelectedConversationId(Number(first.id))
+          setSelectedContactName(first.contact_name)
+          setSelectedContactId(first.contact_id)
+          setCurrentAgentId(first.assigned_agent_id)
+        }
+      } catch (error) {
+        console.error("[inbox] Error auto-select conversation", error)
+      }
+    }
+
+    pickFirstConversation()
+  }, [selectedConversationId, refreshKey])
 
   const handleSelectConversation = (id: number) => {
     setSelectedConversationId(id)
