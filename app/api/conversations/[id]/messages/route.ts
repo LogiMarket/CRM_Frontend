@@ -29,7 +29,6 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           sender_type: m.sender_type,
           sender_id: m.user_id || null,
           message_type: "text",
-          metadata: null,
           created_at: m.created_at,
           sender_name: m.sender_type === "agent" ? user.name : "Cliente",
         }))
@@ -37,41 +36,67 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ messages })
     }
 
-    // Query messages - handle both numeric and UUID conversation IDs
-    const messages = await sql`
-      SELECT 
-        m.id,
-        m.content,
-        m.sender_type,
-        m.sender_id,
-        m.message_type,
-        m.metadata,
-        m.created_at,
-        COALESCE(
-          CASE WHEN m.sender_type = 'contact' THEN contacts.name END,
-          CASE WHEN m.sender_type = 'agent' THEN users.name END,
-          'Unknown'
-        ) as sender_name
-      FROM messages m
-      LEFT JOIN contacts ON m.sender_type = 'contact' AND m.sender_id = contacts.id
-      LEFT JOIN users ON m.sender_type = 'agent' AND m.sender_id = users.id
-      WHERE m.conversation_id::text = ${id}
-      ORDER BY m.created_at ASC
-    `
+    // Query messages - try to get by UUID first, then try as integer
+    let messages = []
+    try {
+      messages = await sql`
+        SELECT 
+          m.id,
+          m.content,
+          m.sender_type,
+          m.sender_id,
+          m.created_at,
+          COALESCE(
+            CASE WHEN m.sender_type = 'contact' THEN c.name END,
+            CASE WHEN m.sender_type = 'agent' THEN u.name END,
+            'Unknown'
+          ) as sender_name
+        FROM messages m
+        LEFT JOIN contacts c ON m.sender_type = 'contact' AND m.sender_id = c.id
+        LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
+        WHERE m.conversation_id::text = ${id}
+        ORDER BY m.created_at ASC
+      `
+    } catch (queryError) {
+      console.error("[GET messages] Query with ::text failed, trying alternate:", queryError)
+      // Try alternate approach if UUID casting fails
+      messages = await sql`
+        SELECT 
+          m.id,
+          m.content,
+          m.sender_type,
+          m.sender_id,
+          m.created_at,
+          COALESCE(
+            CASE WHEN m.sender_type = 'contact' THEN c.name END,
+            CASE WHEN m.sender_type = 'agent' THEN u.name END,
+            'Unknown'
+          ) as sender_name
+        FROM messages m
+        LEFT JOIN contacts c ON m.sender_type = 'contact' AND m.sender_id = c.id
+        LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
+        WHERE CAST(m.conversation_id AS VARCHAR) = ${id}
+        ORDER BY m.created_at ASC
+      `
+    }
 
-    // Mark messages as read
-    await sql`
-      UPDATE messages 
-      SET read_at = NOW() 
-      WHERE conversation_id::text = ${id}
-        AND read_at IS NULL 
-        AND sender_type = 'contact'
-    `
+    // Mark messages as read - silently ignore if it fails
+    try {
+      await sql`
+        UPDATE messages 
+        SET read_at = NOW() 
+        WHERE conversation_id::text = ${id}
+          AND read_at IS NULL 
+          AND sender_type = 'contact'
+      `
+    } catch (error) {
+      console.error("[GET messages] Error marking as read:", error)
+    }
 
     return NextResponse.json({ messages })
   } catch (error) {
-    console.error("[v0] Get messages error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[GET messages] Error:", error)
+    return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 })
   }
 }
 
@@ -114,28 +139,55 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       })
     }
 
-    const [message] = await sql`
-      INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type)
-      VALUES (${id}::uuid, 'agent', ${user.id}, ${content}, 'text')
-      RETURNING id, content, sender_type, sender_id, message_type, created_at
-    `
+    // Try to insert message - handle both UUID and integer conversation_id
+    let message = null
+    try {
+      // Try UUID first
+      const result = await sql`
+        INSERT INTO messages (conversation_id, sender_type, sender_id, content)
+        VALUES (${id}::uuid, 'agent', ${user.id}, ${content})
+        RETURNING id, content, sender_type, sender_id, created_at
+      `
+      message = result[0]
+    } catch (uuidError) {
+      console.error("[POST messages] UUID insert failed, trying integer:", uuidError)
+      // Try as integer
+      try {
+        const result = await sql`
+          INSERT INTO messages (conversation_id, sender_type, sender_id, content)
+          VALUES (${Number.parseInt(id)}, 'agent', ${user.id}, ${content})
+          RETURNING id, content, sender_type, sender_id, created_at
+        `
+        message = result[0]
+      } catch (intError) {
+        console.error("[POST messages] Integer insert also failed:", intError)
+        throw intError
+      }
+    }
 
-    // Update conversation last_message_at
-    await sql`
-      UPDATE conversations 
-      SET last_message_at = NOW() 
-      WHERE id::text = ${id}
-    `
+    // Update conversation last_message_at - try both formats
+    try {
+      await sql`
+        UPDATE conversations 
+        SET last_message_at = NOW() 
+        WHERE id::text = ${id}
+      `
+    } catch (updateError) {
+      console.error("[POST messages] Update failed (not critical):", updateError)
+    }
 
-    return NextResponse.json({ 
-      message: { 
-        ...message, 
+    return NextResponse.json({
+      message: {
+        id: message.id,
+        content: message.content,
+        sender_type: message.sender_type,
+        sender_id: message.sender_id,
+        created_at: message.created_at,
         sender_name: user.name,
-        sender_type: "agent" 
-      } 
+      },
     })
   } catch (error) {
-    console.error("[v0] Send message error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[POST messages] Error:", error)
+    return NextResponse.json({ error: "Failed to send message", details: String(error) }, { status: 500 })
   }
 }

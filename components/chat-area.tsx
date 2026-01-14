@@ -55,11 +55,13 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
 
     try {
       const response = await fetch(`/api/conversations/${conversationId}/messages`)
+      const data = await response.json()
+      
       if (!response.ok) {
-        console.error("[ChatArea] Fetch messages error:", response.status, response.statusText)
+        console.error("[ChatArea] Fetch messages error:", response.status, data)
         return
       }
-      const data = await response.json()
+      
       setMessages(data.messages || [])
     } catch (error) {
       console.error("[ChatArea] Fetch messages error:", error)
