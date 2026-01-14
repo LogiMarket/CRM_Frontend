@@ -2,8 +2,6 @@
 
 import { useState, useEffect, useCallback } from "react"
 
-const POLL_INTERVAL = 5000 // 5 seconds
-
 export interface Message {
   id: string
   content: string
@@ -49,7 +47,7 @@ export function useConversations(onlyAssigned?: boolean) {
   const fetchConversations = useCallback(async (isRefresh = false) => {
     try {
       if (isRefresh) {
-        setRefreshing(true)
+        setRefreshing(false) // keep silent refresh to avoid visible UI flicker
       }
       
       // Fetch from local Next.js API endpoint
@@ -108,11 +106,19 @@ export function useConversations(onlyAssigned?: boolean) {
     // Initial fetch
     fetchConversations(false)
 
-    // Set up polling
-    const intervalId = setInterval(() => fetchConversations(true), POLL_INTERVAL)
+    // Refresh silently when window gains focus or tab becomes visible
+    const handleFocus = () => fetchConversations(true)
+    const handleVisibility = () => {
+      if (!document.hidden) fetchConversations(true)
+    }
 
-    // Cleanup
-    return () => clearInterval(intervalId)
+    window.addEventListener("focus", handleFocus)
+    document.addEventListener("visibilitychange", handleVisibility)
+
+    return () => {
+      window.removeEventListener("focus", handleFocus)
+      document.removeEventListener("visibilitychange", handleVisibility)
+    }
   }, [fetchConversations])
 
   return { conversations, loading, refreshing, error, refetch: fetchConversations }
