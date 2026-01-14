@@ -178,13 +178,40 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     // Optional: forward message to external backend (WhatsApp sender)
     const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL
-    if (backendUrl) {
+    if (backendUrl && user.id) {
       try {
-        await fetch(`${backendUrl}/api/whatsapp/send`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ conversationId: id, content }),
-        })
+        // Get conversation contact phone number for WhatsApp sending
+        const conversation = await sql`
+          SELECT c.phone_number FROM conversations conv
+          LEFT JOIN contacts c ON conv.contact_id = c.id
+          WHERE conv.id::text = ${id}
+          LIMIT 1
+        `
+        
+        if (conversation && conversation[0] && conversation[0].phone_number) {
+          const phoneNumber = conversation[0].phone_number
+          console.log("[POST messages] Forwarding to WhatsApp:", { phoneNumber, content })
+          
+          // Get JWT token to authenticate with backend
+          const sessionToken = request.headers.get('authorization') || ''
+          
+          const sendResponse = await fetch(`${backendUrl}/api/whatsapp/send`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": sessionToken
+            },
+            body: JSON.stringify({ 
+              phone_number: phoneNumber,
+              message: content
+            }),
+          })
+          
+          const sendData = await sendResponse.json()
+          console.log("[POST messages] WhatsApp send response:", { status: sendResponse.status, data: sendData })
+        } else {
+          console.warn("[POST messages] No phone number found for conversation", { id })
+        }
       } catch (forwardError) {
         console.error("[POST messages] Forward to backend failed (non-blocking):", forwardError)
       }
