@@ -44,11 +44,32 @@ export function ConversationDetails({
   const [newComment, setNewComment] = useState("")
   const [currentStatus, setCurrentStatus] = useState(status)
   const [loading, setLoading] = useState(false)
+  const [commentsLoading, setCommentsLoading] = useState(false)
 
   useEffect(() => {
     setCurrentStatus(status)
   }, [status])
 
+  useEffect(() => {
+    if (!conversationId) return
+
+    const loadComments = async () => {
+      setCommentsLoading(true)
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}`)
+        if (response.ok) {
+          const data = await response.json()
+          setComments(data.comments || "")
+        }
+      } catch (error) {
+        console.error("[ConversationDetails] Error loading comments:", error)
+      } finally {
+        setCommentsLoading(false)
+      }
+    }
+
+    loadComments()
+  }, [conversationId])
   const handleStatusChange = async (newStatus: string) => {
     if (!conversationId) return
     
@@ -179,7 +200,11 @@ export function ConversationDetails({
             <CardContent className="space-y-3">
               {comments && (
                 <div className="rounded-md bg-muted p-2">
-                  <p className="text-xs text-foreground whitespace-pre-wrap break-words">{comments}</p>
+                  <div className="text-xs text-foreground whitespace-pre-wrap break-words space-y-1">
+                    {comments.split("\n").map((line, i) => (
+                      <p key={i}>{line}</p>
+                    ))}
+                  </div>
                 </div>
               )}
               
@@ -188,17 +213,17 @@ export function ConversationDetails({
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 className="resize-none h-20 text-xs"
-                disabled={loading}
+                disabled={loading || commentsLoading}
               />
 
               <Button
                 onClick={handleAddComment}
-                disabled={!newComment.trim() || loading}
+                disabled={!newComment.trim() || loading || commentsLoading}
                 size="sm"
                 className="w-full gap-2"
               >
                 <CheckCircle className="h-3 w-3" />
-                {loading ? "Guardando..." : "Guardar Comentario"}
+                {loading || commentsLoading ? "Guardando..." : "Guardar Comentario"}
               </Button>
             </CardContent>
           </Card>
