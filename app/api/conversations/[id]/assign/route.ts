@@ -16,15 +16,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       return NextResponse.json({ success: true })
     }
 
+    // Handle both UUID and integer IDs
     await sql`
       UPDATE conversations 
       SET assigned_agent_id = ${agentId}, updated_at = NOW()
-      WHERE id = ${id}
+      WHERE id::text = ${id} OR id = ${Number.parseInt(id)}
     `
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, message: "Conversation assigned successfully" })
   } catch (error) {
-    console.error("[v0] Assign conversation error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    console.error("[Assign] Error:", error)
+    return NextResponse.json({ error: "Failed to assign conversation", details: String(error) }, { status: 500 })
   }
 }

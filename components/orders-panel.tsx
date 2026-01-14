@@ -5,7 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Search, Package, Truck, CheckCircle, Clock, XCircle } from "lucide-react"
+import { Search, Package, Truck, CheckCircle, Clock, XCircle, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -23,11 +23,24 @@ interface Order {
   phone_number: string
 }
 
-interface OrdersPanelProps {
-  contactId?: number
+interface ConversationDetails {
+  id: string
+  status: string
+  priority: string
+  agent_name?: string
+  created_at: string
+  last_message_at: string
+  contact_name: string
+  phone_number: string
 }
 
-export function OrdersPanel({ contactId }: OrdersPanelProps) {
+interface OrdersPanelProps {
+  contactId?: number | string
+  conversationId?: string | number
+  conversationDetails?: ConversationDetails
+}
+
+export function OrdersPanel({ contactId, conversationId, conversationDetails }: OrdersPanelProps) {
   const [orders, setOrders] = useState<Order[]>([])
   const [search, setSearch] = useState("")
   const [loading, setLoading] = useState(false)
@@ -109,7 +122,49 @@ export function OrdersPanel({ contactId }: OrdersPanelProps) {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-background">
+      {/* Conversation Details */}
+      {conversationDetails && (
+        <div className="border-b border-border bg-gradient-to-r from-primary/5 to-primary/10 p-4">
+          <div className="mb-3 flex items-center gap-2">
+            <Info className="h-4 w-4 text-primary" />
+            <h2 className="font-semibold text-sm text-foreground">Detalles de la Conversación</h2>
+          </div>
+          <div className="grid gap-2 text-xs">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Estatus:</span>
+              <Badge variant="outline" className="capitalize">{conversationDetails.status}</Badge>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Prioridad:</span>
+              <Badge className="capitalize">{conversationDetails.priority}</Badge>
+            </div>
+            {conversationDetails.agent_name && (
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Agente:</span>
+                <span className="font-medium text-foreground">{conversationDetails.agent_name}</span>
+              </div>
+            )}
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Iniciada:</span>
+              <span className="text-foreground">
+                {conversationDetails.created_at
+                  ? format(new Date(conversationDetails.created_at), "dd MMM HH:mm", { locale: es })
+                  : "-"}
+              </span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Último mensaje:</span>
+              <span className="text-foreground">
+                {conversationDetails.last_message_at
+                  ? format(new Date(conversationDetails.last_message_at), "HH:mm", { locale: es })
+                  : "-"}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="border-b border-border bg-card p-4">
         <h2 className="mb-3 font-semibold text-lg text-foreground">Órdenes</h2>
