@@ -15,8 +15,14 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     const { id } = await params
 
     if (isDemoMode) {
+      const conversationId = isNaN(Number(id)) ? id : Number.parseInt(id)
       const messages = demoMessagesStore
-        .filter((m) => m.conversation_id === Number.parseInt(id))
+        .filter((m) => {
+          if (typeof conversationId === "number") {
+            return m.conversation_id === conversationId
+          }
+          return m.conversation_id === Number.parseInt(id)
+        })
         .map((m) => ({
           id: m.id,
           content: m.content,
@@ -31,6 +37,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ messages })
     }
 
+    // Query messages - handle both numeric and UUID conversation IDs
     const messages = await sql`
       SELECT 
         m.id,
@@ -40,14 +47,15 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         m.message_type,
         m.metadata,
         m.created_at,
-        CASE 
-          WHEN m.sender_type = 'contact' THEN contacts.name
-          WHEN m.sender_type = 'agent' THEN users.name
-        END as sender_name
+        COALESCE(
+          CASE WHEN m.sender_type = 'contact' THEN contacts.name END,
+          CASE WHEN m.sender_type = 'agent' THEN users.name END,
+          'Unknown'
+        ) as sender_name
       FROM messages m
       LEFT JOIN contacts ON m.sender_type = 'contact' AND m.sender_id = contacts.id
       LEFT JOIN users ON m.sender_type = 'agent' AND m.sender_id = users.id
-      WHERE m.conversation_id = ${id}
+      WHERE m.conversation_id::text = ${id}
       ORDER BY m.created_at ASC
     `
 
@@ -55,7 +63,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     await sql`
       UPDATE messages 
       SET read_at = NOW() 
-      WHERE conversation_id = ${id} 
+      WHERE conversation_id::text = ${id}
         AND read_at IS NULL 
         AND sender_type = 'contact'
     `
@@ -108,7 +116,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
 
     const [message] = await sql`
       INSERT INTO messages (conversation_id, sender_type, sender_id, content, message_type)
-      VALUES (${id}, 'agent', ${user.id}, ${content}, 'text')
+      VALUES (${id}::uuid, 'agent', ${user.id}, ${content}, 'text')
       RETURNING id, content, sender_type, sender_id, message_type, created_at
     `
 
@@ -116,10 +124,16 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     await sql`
       UPDATE conversations 
       SET last_message_at = NOW() 
-      WHERE id = ${id}
+      WHERE id::text = ${id}
     `
 
-    return NextResponse.json({ message: { ...message, sender_name: user.name } })
+    return NextResponse.json({ 
+      message: { 
+        ...message, 
+        sender_name: user.name,
+        sender_type: "agent" 
+      } 
+    })
   } catch (error) {
     console.error("[v0] Send message error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

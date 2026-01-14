@@ -53,15 +53,16 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
   const fetchMessages = async () => {
     if (!conversationId) return
 
-    setLoading(true)
     try {
       const response = await fetch(`/api/conversations/${conversationId}/messages`)
+      if (!response.ok) {
+        console.error("[ChatArea] Fetch messages error:", response.status, response.statusText)
+        return
+      }
       const data = await response.json()
       setMessages(data.messages || [])
     } catch (error) {
-      console.error("[v0] Fetch messages error:", error)
-    } finally {
-      setLoading(false)
+      console.error("[ChatArea] Fetch messages error:", error)
     }
   }
 
@@ -69,21 +70,42 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
     e.preventDefault()
     if (!newMessage.trim() || !conversationId || sending) return
 
+    const messageContent = newMessage
     setSending(true)
+    setNewMessage("") // Clear input immediately for better UX
+    
     try {
       const response = await fetch(`/api/conversations/${conversationId}/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: newMessage }),
+        body: JSON.stringify({ content: messageContent }),
       })
 
+      if (!response.ok) {
+        console.error("[ChatArea] Send message error:", response.status, response.statusText)
+        // Restore message if sending failed
+        setNewMessage(messageContent)
+        return
+      }
+
       const data = await response.json()
-      if (response.ok) {
-        setMessages([...messages, data.message])
-        setNewMessage("")
+      if (data.message) {
+        // Add message to list with full data
+        setMessages([
+          ...messages,
+          {
+            id: data.message.id,
+            content: data.message.content,
+            sender_type: data.message.sender_type || "agent",
+            sender_name: data.message.sender_name || "Agent",
+            created_at: data.message.created_at || new Date().toISOString(),
+          },
+        ])
       }
     } catch (error) {
-      console.error("[v0] Send message error:", error)
+      console.error("[ChatArea] Send message error:", error)
+      // Restore message if sending failed
+      setNewMessage(messageContent)
     } finally {
       setSending(false)
     }
