@@ -76,6 +76,56 @@ export function ConversationDetails({
     loadComments()
   }, [conversationId])
   
+  const getStatusColor = (stat: string) => {
+    switch (stat) {
+      case 'open':
+        return 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-700'
+      case 'assigned':
+        return 'bg-yellow-50 dark:bg-yellow-950/40 border-yellow-300 dark:border-yellow-700'
+      case 'resolved':
+        return 'bg-green-50 dark:bg-green-950/40 border-green-300 dark:border-green-700'
+      case 'closed':
+        return 'bg-gray-50 dark:bg-gray-950/40 border-gray-300 dark:border-gray-700'
+      default:
+        return 'bg-card border-border'
+    }
+  }
+
+  const getStatusBadgeColor = (stat: string) => {
+    switch (stat) {
+      case 'open':
+        return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 border-blue-300'
+      case 'assigned':
+        return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100 border-yellow-300'
+      case 'resolved':
+        return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 border-green-300'
+      case 'closed':
+        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 border-gray-300'
+      default:
+        return 'bg-gray-100 text-gray-800'
+    }
+  }
+
+  const getStatusIcon = (stat: string) => {
+    switch (stat) {
+      case 'open': return '🔵'
+      case 'assigned': return '🟡'
+      case 'resolved': return '🟢'
+      case 'closed': return '⚫'
+      default: return '•'
+    }
+  }
+
+  const getStatusLabel = (stat: string) => {
+    const labels: Record<string, string> = {
+      'open': 'Abierta',
+      'assigned': 'Asignada',
+      'resolved': 'Resuelta',
+      'closed': 'Cerrada'
+    }
+    return labels[stat] || stat
+  }
+
   const handleStatusChange = async (newStatus: string) => {
     if (!conversationId) return
     
@@ -157,81 +207,123 @@ export function ConversationDetails({
       <ScrollArea className="flex-1">
         <div className="space-y-4 p-4">
           {/* Contact Info */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm">{contact_name || "Contacto"}</CardTitle>
-              <CardDescription className="text-xs">{phone_number || "Sin número"}</CardDescription>
+          <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/10">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <span>📱</span> {contact_name || "Contacto"}
+              </CardTitle>
+              <CardDescription className="text-xs text-blue-700 dark:text-blue-300">
+                {phone_number || "Sin número"}
+              </CardDescription>
             </CardHeader>
           </Card>
 
-          {/* Status and Priority */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium">Estado</CardTitle>
+          {/* Status Section */}
+          <Card className={`border-l-4 ${getStatusColor(currentStatus)} shadow-sm hover:shadow-md transition-shadow`}>
+            <CardHeader className="pb-3">
+              <div className="flex items-center justify-between">
+                <CardTitle className="text-xs font-bold flex items-center gap-2">
+                  <span>{getStatusIcon(currentStatus)}</span>
+                  Estado
+                </CardTitle>
+                <Badge className={`${getStatusBadgeColor(currentStatus)} border`}>
+                  {getStatusLabel(currentStatus)}
+                </Badge>
+              </div>
             </CardHeader>
             <CardContent className="space-y-3">
               <Select value={currentStatus} onValueChange={handleStatusChange} disabled={loading}>
-                <SelectTrigger className="h-8 text-xs">
+                <SelectTrigger className="h-9 text-xs shadow-sm hover:shadow-md transition-shadow">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="open">Abierta</SelectItem>
-                  <SelectItem value="assigned">Asignada</SelectItem>
-                  <SelectItem value="resolved">Resuelta</SelectItem>
-                  <SelectItem value="closed">Cerrada</SelectItem>
+                  <SelectItem value="open">
+                    <span className="flex items-center gap-2">🔵 Abierta</span>
+                  </SelectItem>
+                  <SelectItem value="assigned">
+                    <span className="flex items-center gap-2">🟡 Asignada</span>
+                  </SelectItem>
+                  <SelectItem value="resolved">
+                    <span className="flex items-center gap-2">🟢 Resuelta</span>
+                  </SelectItem>
+                  <SelectItem value="closed">
+                    <span className="flex items-center gap-2">⚫ Cerrada</span>
+                  </SelectItem>
                 </SelectContent>
               </Select>
+            </CardContent>
+          </Card>
 
-              <div className="flex flex-col gap-2">
-                <span className="text-xs text-muted-foreground">Prioridad:</span>
-                <Select value={currentPriority} onValueChange={handlePriorityChange} disabled={loading}>
-                  <SelectTrigger className="h-8 text-xs">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Baja</SelectItem>
-                    <SelectItem value="medium">Media</SelectItem>
-                    <SelectItem value="high">Alta</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+          {/* Priority */}
+          <Card className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs font-bold flex items-center gap-2">
+                <span>⚡</span> Prioridad
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Select value={currentPriority} onValueChange={handlePriorityChange} disabled={loading}>
+                <SelectTrigger className="h-9 text-xs shadow-sm hover:shadow-md transition-shadow">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="low">🔵 Baja</SelectItem>
+                  <SelectItem value="medium">🟡 Media</SelectItem>
+                  <SelectItem value="high">🔴 Alta</SelectItem>
+                </SelectContent>
+              </Select>
+            </CardContent>
+          </Card>
 
-              {agent_name && (
-                <div className="flex justify-between text-xs">
-                  <span className="text-muted-foreground">Agente:</span>
-                  <span className="font-medium">{agent_name}</span>
+          {/* Agent Info */}
+          {agent_name && (
+            <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-purple-50 to-purple-50/50 dark:from-purple-950/30 dark:to-purple-950/10">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-xs font-bold flex items-center gap-2">
+                  <span>👤</span> Agente Asignado
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-sm font-semibold text-purple-700 dark:text-purple-300">
+                  {agent_name}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Timeline */}
+          <Card className="border-l-4 border-l-gray-400 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs font-bold flex items-center gap-2">
+                <span>📅</span> Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-2 text-xs">
+              {created_at && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Creada:</span>
+                  <span className="font-medium">
+                    {format(new Date(created_at), "dd MMM yyyy, HH:mm", { locale: es })}
+                  </span>
+                </div>
+              )}
+              {last_message_at && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Último mensaje:</span>
+                  <span className="font-medium">
+                    {format(new Date(last_message_at), "dd MMM yyyy, HH:mm", { locale: es })}
+                  </span>
                 </div>
               )}
             </CardContent>
           </Card>
 
           {/* Timestamps */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium">Timeline</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2 text-xs">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Iniciada:</span>
-                <span>
-                  {created_at ? format(new Date(created_at), "dd MMM HH:mm", { locale: es }) : "-"}
-                </span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Último mensaje:</span>
-                <span>
-                  {last_message_at ? format(new Date(last_message_at), "dd MMM HH:mm", { locale: es }) : "-"}
-                </span>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Comments */}
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-xs font-medium flex items-center gap-1">
-                <MessageSquare className="h-3 w-3" />
-                Comentarios
+          <Card className="border-l-4 border-l-indigo-500 shadow-sm">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-xs font-bold flex items-center gap-2">
+                <span>💬</span> Comentarios
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">

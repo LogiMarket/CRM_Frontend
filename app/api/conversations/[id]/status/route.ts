@@ -24,21 +24,27 @@ export async function PUT(
     }
 
     // Try to update as UUID first, then as integer
-    // Nota: el campo status ya es texto, evitamos el cast para evitar errores con enums o domains
-    let result: any = await sql!`
-      UPDATE conversations 
-      SET status = ${status}, updated_at = NOW()
-      WHERE id::text = ${id}
-      RETURNING id, status::text as status
-    `
-
-    if (result.length === 0 && !isNaN(Number(id))) {
+    // Status is VARCHAR, no casting needed
+    let result: any = []
+    try {
       result = await sql!`
         UPDATE conversations 
         SET status = ${status}, updated_at = NOW()
-        WHERE id = ${Number.parseInt(id)}
-        RETURNING id, status::text as status
+        WHERE id::text = ${id}
+        RETURNING id, status
       `
+    } catch (e) {
+      // Try as integer
+      if (!isNaN(Number(id))) {
+        result = await sql!`
+          UPDATE conversations 
+          SET status = ${status}, updated_at = NOW()
+          WHERE id = ${Number.parseInt(id)}
+          RETURNING id, status
+        `
+      } else {
+        throw e
+      }
     }
 
     if (result.length === 0) {
