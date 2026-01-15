@@ -24,9 +24,10 @@ export async function PUT(
     }
 
     // Try to update as UUID first, then as integer
+    // Nota: el campo status ya es texto, evitamos el cast para evitar errores con enums o domains
     let result: any = await sql!`
       UPDATE conversations 
-      SET status = ${status}::text, updated_at = NOW()
+      SET status = ${status}, updated_at = NOW()
       WHERE id::text = ${id}
       RETURNING id, status::text as status
     `
@@ -34,7 +35,7 @@ export async function PUT(
     if (result.length === 0 && !isNaN(Number(id))) {
       result = await sql!`
         UPDATE conversations 
-        SET status = ${status}::text, updated_at = NOW()
+        SET status = ${status}, updated_at = NOW()
         WHERE id = ${Number.parseInt(id)}
         RETURNING id, status::text as status
       `
