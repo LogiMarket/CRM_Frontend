@@ -38,6 +38,15 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
       .slice(0, 2)
   }
 
+  const getStatusLabel = (status: string) => {
+    const labels: Record<string, string> = {
+      "available": "Disponible",
+      "busy": "Ocupado",
+      "offline": "Desconectado",
+    }
+    return labels[status] || status
+  }
+
   const isInbox = pathname === "/inbox"
   const isAgentes = pathname.startsWith("/inbox/agentes")
   const isConfiguracion = pathname.startsWith("/inbox/configuracion")
@@ -125,7 +134,7 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
               <p className="truncate font-medium text-foreground text-sm">{user.name}</p>
-              <p className="truncate text-muted-foreground text-xs">{user.status}</p>
+              <p className="truncate text-muted-foreground text-xs">{getStatusLabel(user.status)}</p>
             </div>
           )}
         </div>

@@ -70,6 +70,16 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
     }
   }
 
+  const getPriorityLabel = (priority: string) => {
+    const labels: Record<string, string> = {
+      "high": "Alta",
+      "medium": "Media",
+      "normal": "Normal",
+      "low": "Baja",
+    }
+    return labels[priority] || priority
+  }
+
   if (loading) {
     return (
       <div className="flex h-full items-center justify-center">
@@ -136,7 +146,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
                       getPriorityColor(conv.priority),
                     )}
                   >
-                    {conv.priority}
+                    {getPriorityLabel(conv.priority)}
                   </Badge>
                   {conv.agent_name && (
                     <span className="truncate text-foreground text-xs font-medium">👤 {conv.agent_name}</span>
