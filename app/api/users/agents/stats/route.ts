@@ -11,7 +11,7 @@ export async function GET() {
 
     console.log("[Agents Stats] Fetching agent statistics...")
 
-    // Get count of conversations per user (sin filtrar por nombre de rol para evitar desajustes)
+    // Get count of conversations per user
     const result = await sql!`
       SELECT 
         u.id,
@@ -19,8 +19,8 @@ export async function GET() {
         u.email,
         COALESCE(r.name, 'agent') as role_name,
         COUNT(c.id) as total_count,
-        COUNT(c.id) as active_count,
-        0 as resolved_count
+        COUNT(CASE WHEN c.status = 'active' THEN 1 END) as active_count,
+        COUNT(CASE WHEN c.status = 'resolved' THEN 1 END) as resolved_count
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
       LEFT JOIN conversations c ON c.assigned_agent_id = u.id

@@ -17,7 +17,7 @@ export interface Conversation {
   customer_name: string
   customer_phone: string
   customer_email?: string
-  status: "open" | "assigned" | "resolved"
+  status: "active" | "resolved"
   priority: "low" | "medium" | "high"
   assigned_agent_id?: string
   last_message?: Message
@@ -70,7 +70,7 @@ export function useConversations(onlyAssigned?: boolean) {
         customer_name: conv.contact_name || "Unknown",
         customer_phone: conv.phone_number || "",
         customer_email: undefined,
-        status: (conv.status as "open" | "assigned" | "resolved") || "open",
+        status: (conv.status as "active" | "resolved") || "active",
         priority: (conv.priority as "low" | "medium" | "high") || "low",
         assigned_agent_id: conv.assigned_agent_id ? String(conv.assigned_agent_id) : undefined,
         last_message: conv.last_message ? {

@@ -18,9 +18,9 @@ export async function PUT(
       return NextResponse.json({ error: "Status required" }, { status: 400 })
     }
 
-    const validStatuses = ["open", "assigned", "resolved", "closed"]
+    const validStatuses = ["active", "resolved"]
     if (!validStatuses.includes(status)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+      return NextResponse.json({ error: "Invalid status. Use 'active' or 'resolved'" }, { status: 400 })
     }
 
     // Try to update as UUID first, then as integer

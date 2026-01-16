@@ -17,11 +17,11 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     }
 
     // Handle both UUID and integer IDs - try UUID cast first, then fallback to integer
-    // When assigning, also update status to 'assigned' if it was 'open'
+    // When assigning, set status to 'active' if not already resolved
     let result = await sql!`
       UPDATE conversations 
       SET assigned_agent_id = ${agentId}, 
-          status = CASE WHEN status = 'open' THEN 'assigned' ELSE status END,
+          status = CASE WHEN status != 'resolved' THEN 'active' ELSE status END,
           updated_at = NOW()
       WHERE id::text = ${id}
       RETURNING id, assigned_agent_id, status
@@ -32,7 +32,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       result = await sql!`
         UPDATE conversations 
         SET assigned_agent_id = ${agentId}, 
-            status = CASE WHEN status = 'open' THEN 'assigned' ELSE status END,
+            status = CASE WHEN status != 'resolved' THEN 'active' ELSE status END,
             updated_at = NOW()
         WHERE id = ${Number.parseInt(id)}
         RETURNING id, assigned_agent_id, status

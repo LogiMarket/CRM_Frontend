@@ -237,17 +237,11 @@ export function ConversationDetails({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="open">
-                    <span className="flex items-center gap-2">🔵 Abierta</span>
-                  </SelectItem>
-                  <SelectItem value="assigned">
-                    <span className="flex items-center gap-2">🟡 Asignada</span>
+                  <SelectItem value="active">
+                    <span className="flex items-center gap-2">🔵 Activa</span>
                   </SelectItem>
                   <SelectItem value="resolved">
                     <span className="flex items-center gap-2">🟢 Resuelta</span>
-                  </SelectItem>
-                  <SelectItem value="closed">
-                    <span className="flex items-center gap-2">⚫ Cerrada</span>
                   </SelectItem>
                 </SelectContent>
               </Select>
