@@ -46,7 +46,22 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
     }
   }, [conversationId])
 
-  // No scroll automático ya que los mensajes nuevos están arriba
+  // Auto-scroll al bottom cuando hay nuevos mensajes
+  useEffect(() => {
+    scrollToBottom()
+  }, [messages])
+
+  const scrollToBottom = () => {
+    if (scrollRef.current) {
+      // Pequeño delay para asegurar que el DOM se ha actualizado
+      setTimeout(() => {
+        const scrollElement = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]')
+        if (scrollElement) {
+          scrollElement.scrollTop = scrollElement.scrollHeight
+        }
+      }, 0)
+    }
+  }
 
   const fetchMessages = async () => {
     if (!conversationId) return
@@ -60,9 +75,9 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
         return
       }
       
-      // Invertir el orden: más reciente arriba
+      // Ordenar por fecha ascendente (más viejos primero, más recientes último)
       const sortedMessages = (data.messages || []).sort((a: Message, b: Message) => {
-        return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       })
       setMessages(sortedMessages)
     } catch (error) {
@@ -94,8 +109,9 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
 
       const data = await response.json()
       if (data.message) {
-        // Add message to BEGINNING of list (most recent first)
+        // Agregar nuevo mensaje al final (ya que están en orden ascendente)
         setMessages([
+          ...messages,
           {
             id: data.message.id,
             content: data.message.content,
@@ -103,7 +119,6 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
             sender_name: data.message.sender_name || "Agent",
             created_at: data.message.created_at || new Date().toISOString(),
           },
-          ...messages,
         ])
       }
     } catch (error) {
