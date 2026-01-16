@@ -51,22 +51,12 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
     if (messages.length > 0) {
       // Scroll al bottom cuando hay mensajes
       setTimeout(() => {
-        const scrollElement = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]')
-        if (scrollElement) {
-          scrollElement.scrollTop = scrollElement.scrollHeight
+        if (scrollRef.current) {
+          scrollRef.current.scrollTop = scrollRef.current.scrollHeight
         }
-      }, 100)
+      }, 50)
     }
   }, [messages])
-
-  const scrollToBottom = () => {
-    setTimeout(() => {
-      const scrollElement = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]')
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight
-      }
-    }, 100)
-  }
 
   const fetchMessages = async () => {
     if (!conversationId) return
@@ -195,8 +185,11 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 overflow-hidden" ref={scrollRef}>
-        <div className="space-y-4 p-6 pb-24">
+      <div 
+        ref={scrollRef}
+        className="flex-1 overflow-y-auto overflow-x-hidden"
+      >
+        <div className="space-y-4 p-6">
           {loading ? (
             <p className="text-center text-muted-foreground text-sm">Cargando mensajes...</p>
           ) : messages.length === 0 ? (
@@ -247,7 +240,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
             })
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Message Input */}
       <div className="border-t border-border bg-card p-4 sticky bottom-0">
