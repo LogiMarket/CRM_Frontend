@@ -48,19 +48,24 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
 
   // Auto-scroll al bottom cuando hay nuevos mensajes
   useEffect(() => {
-    scrollToBottom()
-  }, [messages])
-
-  const scrollToBottom = () => {
-    if (scrollRef.current) {
-      // Pequeño delay para asegurar que el DOM se ha actualizado
+    if (messages.length > 0) {
+      // Scroll al bottom cuando hay mensajes
       setTimeout(() => {
         const scrollElement = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]')
         if (scrollElement) {
           scrollElement.scrollTop = scrollElement.scrollHeight
         }
-      }, 0)
+      }, 100)
     }
+  }, [messages])
+
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      const scrollElement = scrollRef.current?.querySelector('[data-radix-scroll-area-viewport]')
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight
+      }
+    }, 100)
   }
 
   const fetchMessages = async () => {
@@ -197,39 +202,49 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
           ) : messages.length === 0 ? (
             <p className="text-center text-muted-foreground text-sm">No hay mensajes aún</p>
           ) : (
-            messages.map((msg, index) => (
-              <div
-                key={msg.id}
-                className={cn("flex gap-3 animate-fade-in-up", msg.sender_type === "agent" && "flex-row-reverse")}
-                style={{ animationDelay: `${index * 0.05}s` }}
-              >
-                <Avatar className="h-8 w-8 flex-shrink-0">
-                  <AvatarFallback
-                    className={cn(
-                      "font-semibold",
-                      msg.sender_type === "agent" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
+            messages.map((msg, index) => {
+              // Comparar hora con el mensaje anterior
+              const prevMsg = index > 0 ? messages[index - 1] : null
+              const currentTime = format(new Date(msg.created_at), "dd MMM HH:mm", { locale: es })
+              const prevTime = prevMsg ? format(new Date(prevMsg.created_at), "dd MMM HH:mm", { locale: es }) : null
+              const showTimestamp = !prevTime || currentTime !== prevTime
+
+              return (
+                <div
+                  key={msg.id}
+                  className={cn("flex gap-3 animate-fade-in-up", msg.sender_type === "agent" && "flex-row-reverse")}
+                  style={{ animationDelay: `${index * 0.05}s` }}
+                >
+                  <Avatar className="h-8 w-8 flex-shrink-0">
+                    <AvatarFallback
+                      className={cn(
+                        "font-semibold",
+                        msg.sender_type === "agent" ? "bg-primary text-primary-foreground" : "bg-muted text-foreground",
+                      )}
+                    >
+                      {getInitials(msg.sender_name)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className={cn("max-w-[70%] space-y-1", msg.sender_type === "agent" && "items-end")}>
+                    <div
+                      className={cn(
+                        "rounded-lg px-4 py-2 shadow-sm transition-all hover:shadow-md",
+                        msg.sender_type === "agent"
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-card text-foreground border border-border",
+                      )}
+                    >
+                      <p className="text-sm leading-relaxed">{msg.content}</p>
+                    </div>
+                    {showTimestamp && (
+                      <p className="text-muted-foreground text-xs px-1">
+                        {currentTime}
+                      </p>
                     )}
-                  >
-                    {getInitials(msg.sender_name)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className={cn("max-w-[70%] space-y-1", msg.sender_type === "agent" && "items-end")}>
-                  <div
-                    className={cn(
-                      "rounded-lg px-4 py-2 shadow-sm transition-all hover:shadow-md",
-                      msg.sender_type === "agent"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-card text-foreground border border-border",
-                    )}
-                  >
-                    <p className="text-sm leading-relaxed">{msg.content}</p>
                   </div>
-                  <p className="text-muted-foreground text-xs px-1">
-                    {format(new Date(msg.created_at), "dd MMM HH:mm", { locale: es })}
-                  </p>
                 </div>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       </ScrollArea>
