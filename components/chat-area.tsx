@@ -197,7 +197,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
           ) : messages.length === 0 ? (
             <p className="text-center text-muted-foreground text-sm">No hay mensajes aún</p>
           ) : (
-            [...messages].reverse().map((msg, index) => (
+            messages.map((msg, index) => (
               <div
                 key={msg.id}
                 className={cn("flex gap-3 animate-fade-in-up", msg.sender_type === "agent" && "flex-row-reverse")}
@@ -225,7 +225,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
                     <p className="text-sm leading-relaxed">{msg.content}</p>
                   </div>
                   <p className="text-muted-foreground text-xs px-1">
-                    {format(new Date(msg.created_at), "HH:mm", { locale: es })}
+                    {format(new Date(msg.created_at), "dd MMM HH:mm", { locale: es })}
                   </p>
                 </div>
               </div>
