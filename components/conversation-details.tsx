@@ -79,13 +79,27 @@ export function ConversationDetails({
         const response = await fetch(`/api/conversations/${conversationId}`)
         if (response.ok) {
           const data = await response.json()
+          console.log("[ConversationDetails] Comments data:", data.comments, typeof data.comments)
           if (data.comments) {
             try {
               const parsed = JSON.parse(data.comments)
+              console.log("[ConversationDetails] Parsed comments:", parsed)
               setComments(Array.isArray(parsed) ? parsed : [])
-            } catch {
-              // Old format - plain text, convert to empty array
-              setComments([])
+            } catch (e) {
+              // Old format - plain text, try to convert manually
+              console.log("[ConversationDetails] Could not parse as JSON, data is:", data.comments)
+              if (typeof data.comments === "string" && data.comments.trim()) {
+                const textComments = data.comments.split("\n").filter((line: string) => line.trim())
+                const jsonArray = textComments.map((text: string, index: number) => ({
+                  id: `${Date.now()}-${index}`,
+                  text: text.trim(),
+                  created_at: new Date().toISOString(),
+                }))
+                console.log("[ConversationDetails] Converted to JSON:", jsonArray)
+                setComments(jsonArray)
+              } else {
+                setComments([])
+              }
             }
           } else {
             setComments([])
@@ -399,7 +413,7 @@ export function ConversationDetails({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 px-2 sm:px-3 pb-2">
-              {comments.length > 0 && (
+              {comments && comments.length > 0 ? (
                 <div className="space-y-2 max-h-40 overflow-y-auto rounded-md border border-border p-2 bg-muted/50">
                   {comments.map((comment) => (
                     <div
@@ -473,6 +487,8 @@ export function ConversationDetails({
                     </div>
                   ))}
                 </div>
+              ) : (
+                <p className="text-xs text-muted-foreground py-2">No hay comentarios</p>
               )}
               
               <Textarea

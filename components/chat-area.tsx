@@ -191,7 +191,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
 
       {/* Messages */}
       <ScrollArea className="flex-1 overflow-hidden" ref={scrollRef}>
-        <div className="flex flex-col-reverse space-y-4 space-y-reverse p-6">
+        <div className="flex flex-col-reverse p-6">
           {loading ? (
             <p className="text-center text-muted-foreground text-sm">Cargando mensajes...</p>
           ) : messages.length === 0 ? (
@@ -200,7 +200,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
             messages.map((msg, index) => (
               <div
                 key={msg.id}
-                className={cn("flex gap-3 animate-fade-in-up", msg.sender_type === "agent" && "flex-row-reverse")}
+                className={cn("flex gap-3 animate-fade-in-up mb-4", msg.sender_type === "agent" && "flex-row-reverse")}
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
                 <Avatar className="h-8 w-8 flex-shrink-0">
