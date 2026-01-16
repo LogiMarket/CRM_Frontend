@@ -159,7 +159,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
             <AssignAgentDialog
               conversationId={conversationId.toString()}
               currentAgentId={currentAgentId?.toString()}
-              onAssign={(agentName) => onUpdate?.()}
+              onAssign={(agentId, agentName) => onUpdate?.()}
             />
           )}
           <Button variant="ghost" size="icon" className="hover:bg-accent transition-colors">

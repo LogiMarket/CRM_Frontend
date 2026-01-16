@@ -27,7 +27,7 @@ interface Agent {
 interface AssignAgentDialogProps {
   conversationId: string
   currentAgentId?: string
-  onAssign: (agentName?: string) => void
+  onAssign: (agentId: string, agentName: string) => void
 }
 
 export function AssignAgentDialog({ conversationId, currentAgentId, onAssign }: AssignAgentDialogProps) {
@@ -52,7 +52,7 @@ export function AssignAgentDialog({ conversationId, currentAgentId, onAssign }: 
       if (response.ok) {
         const result = await response.json()
         console.log("[AssignAgentDialog] Assignment successful:", result)
-        onAssign(agent?.name)
+        onAssign(agentId, agent?.name || "")
         setOpen(false)
       } else {
         const error = await response.json()

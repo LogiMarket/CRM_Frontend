@@ -105,6 +105,17 @@ export default function InboxPage() {
     setRefreshKey((prev) => prev + 1)
   }
 
+  const handleAgentChange = (agentId: string, agentName: string) => {
+    setCurrentAgentId(Number(agentId))
+    if (conversationDetails) {
+      setConversationDetails({
+        ...conversationDetails,
+        agent_name: agentName,
+        assigned_agent_id: Number(agentId),
+      })
+    }
+  }
+
   return (
     <>
       <InboxHeader />
@@ -134,6 +145,7 @@ export default function InboxPage() {
               <OrdersPanel 
                 conversationDetails={conversationDetails}
                 onUpdate={handleUpdate}
+                onAgentChange={handleAgentChange}
               />
           </div>
         )}

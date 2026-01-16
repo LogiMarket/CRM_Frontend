@@ -40,6 +40,7 @@ export function ConversationDetails({
   contact_name,
   phone_number,
   onUpdate,
+  onAgentChange,
 }: ConversationDetailsProps) {
   const [comments, setComments] = useState("")
   const [newComment, setNewComment] = useState("")
@@ -197,6 +198,11 @@ export function ConversationDetails({
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleAgentUpdate = (agentId: string, agentName: string) => {
+    setCurrentAgentName(agentName)
+    onAgentChange?.(agentId, agentName)
   }
 
   return (
