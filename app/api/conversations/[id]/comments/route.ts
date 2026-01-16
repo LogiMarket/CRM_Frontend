@@ -148,8 +148,17 @@ export async function PUT(
     if (getResult[0].comments) {
       try {
         comments = JSON.parse(getResult[0].comments)
+        if (!Array.isArray(comments)) {
+          comments = []
+        }
       } catch {
-        return NextResponse.json({ error: "Invalid comments format" }, { status: 400 })
+        // Old format - convert text to JSON array
+        const textComments = String(getResult[0].comments).split("\n").filter((line: string) => line.trim())
+        comments = textComments.map((text: string, index: number) => ({
+          id: `${Date.now()}-${index}`,
+          text: text.trim(),
+          created_at: new Date().toISOString(),
+        }))
       }
     }
 
@@ -242,8 +251,17 @@ export async function DELETE(
     if (getResult[0].comments) {
       try {
         comments = JSON.parse(getResult[0].comments)
+        if (!Array.isArray(comments)) {
+          comments = []
+        }
       } catch {
-        return NextResponse.json({ error: "Invalid comments format" }, { status: 400 })
+        // Old format - convert text to JSON array
+        const textComments = String(getResult[0].comments).split("\n").filter((line: string) => line.trim())
+        comments = textComments.map((text: string, index: number) => ({
+          id: `${Date.now()}-${index}`,
+          text: text.trim(),
+          created_at: new Date().toISOString(),
+        }))
       }
     }
 

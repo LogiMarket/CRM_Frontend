@@ -187,27 +187,30 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
       {/* Messages */}
       <div 
         ref={scrollRef}
-        className="flex-1 overflow-y-auto overflow-x-hidden"
+        className="flex-1 overflow-y-auto overflow-x-hidden bg-muted/20"
       >
-        <div className="space-y-4 p-6">
+        <div className="flex flex-col gap-4 p-6 min-h-full">
           {loading ? (
             <p className="text-center text-muted-foreground text-sm">Cargando mensajes...</p>
           ) : messages.length === 0 ? (
             <p className="text-center text-muted-foreground text-sm">No hay mensajes aún</p>
           ) : (
-            messages.map((msg, index) => {
-              // Comparar hora con el mensaje anterior
-              const prevMsg = index > 0 ? messages[index - 1] : null
-              const currentTime = format(new Date(msg.created_at), "dd MMM HH:mm", { locale: es })
-              const prevTime = prevMsg ? format(new Date(prevMsg.created_at), "dd MMM HH:mm", { locale: es }) : null
-              const showTimestamp = !prevTime || currentTime !== prevTime
+            <>
+              {/* Spacer para empujar mensajes hacia abajo */}
+              <div className="flex-1 min-h-0"></div>
+              {messages.map((msg, index) => {
+                // Comparar hora con el mensaje anterior
+                const prevMsg = index > 0 ? messages[index - 1] : null
+                const currentTime = format(new Date(msg.created_at), "dd MMM HH:mm", { locale: es })
+                const prevTime = prevMsg ? format(new Date(prevMsg.created_at), "dd MMM HH:mm", { locale: es }) : null
+                const showTimestamp = !prevTime || currentTime !== prevTime
 
-              return (
-                <div
-                  key={msg.id}
-                  className={cn("flex gap-3 animate-fade-in-up", msg.sender_type === "agent" && "flex-row-reverse")}
-                  style={{ animationDelay: `${index * 0.05}s` }}
-                >
+                return (
+                  <div
+                    key={msg.id}
+                    className={cn("flex gap-3 animate-fade-in-up flex-shrink-0", msg.sender_type === "agent" && "flex-row-reverse")}
+                    style={{ animationDelay: `${index * 0.05}s` }}
+                  >
                   <Avatar className="h-8 w-8 flex-shrink-0">
                     <AvatarFallback
                       className={cn(
@@ -237,7 +240,8 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
                   </div>
                 </div>
               )
-            })
+            })}
+            </>
           )}
         </div>
       </div>
