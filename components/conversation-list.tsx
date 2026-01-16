@@ -105,56 +105,62 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
   }
 
   return (
-    <div className="h-full flex flex-col">
-      {/* Refresh banner omitido para evitar parpadeo visible */}
+    <div className="h-full flex flex-col bg-background">
       <ScrollArea className="flex-1">
-        <div className="space-y-1 p-2">
+        <div className="space-y-2 p-3">
         {conversations.map((conv) => (
-          <button
+          <div
             key={conv.id}
             onClick={() => onSelectConversation(conv.id)}
             className={cn(
-              "w-full rounded-lg p-3 text-left transition-all duration-200",
-              "hover:bg-accent/80 hover:shadow-md border border-transparent hover:border-border",
-              selectedId === conv.id && "bg-primary/10 border-primary/30 shadow-sm",
+              "relative rounded-xl p-4 text-left transition-all duration-200 cursor-pointer",
+              "bg-card border-2 shadow-sm hover:shadow-lg",
+              "hover:border-primary/50 hover:scale-[1.02]",
+              selectedId === conv.id 
+                ? "border-primary bg-primary/5 shadow-md" 
+                : "border-border hover:bg-accent/50",
             )}
           >
             <div className="flex items-start gap-3">
-              <Avatar className="h-12 w-12 flex-shrink-0 transition-transform duration-200 hover:scale-105">
-                <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
+              <Avatar className="h-11 w-11 flex-shrink-0 ring-2 ring-background shadow-sm">
+                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm">
                   {getInitials(conv.contact_name)}
                 </AvatarFallback>
               </Avatar>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="truncate font-semibold text-sm text-foreground">{conv.contact_name}</h3>
-                  <span className="flex-shrink-0 text-muted-foreground text-xs">
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <h3 className="truncate font-bold text-sm text-foreground">{conv.contact_name}</h3>
+                  <span className="flex-shrink-0 text-muted-foreground text-xs font-medium">
                     {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: es })}
                   </span>
                 </div>
-                <p className="truncate text-muted-foreground text-sm mt-0.5">{conv.last_message || "Sin mensajes"}</p>
-                <div className="mt-2 flex items-center gap-2 flex-wrap">
+                <p className="line-clamp-2 text-muted-foreground text-xs leading-relaxed mb-2">
+                  {conv.last_message || "Sin mensajes"}
+                </p>
+                <div className="flex items-center gap-1.5 flex-wrap">
                   {conv.unread_count > 0 && (
-                    <Badge variant="default" className="h-5 rounded-full px-2 text-xs font-semibold">
+                    <Badge variant="default" className="h-5 rounded-full px-2 text-xs font-bold shadow-sm">
                       {conv.unread_count}
                     </Badge>
                   )}
                   <Badge
                     variant="outline"
                     className={cn(
-                      "h-5 rounded-full px-2 text-xs font-semibold border",
+                      "h-5 rounded-full px-2 text-xs font-semibold border-2",
                       getPriorityColor(conv.priority),
                     )}
                   >
                     {getPriorityLabel(conv.priority)}
                   </Badge>
                   {conv.agent_name && (
-                    <span className="truncate text-foreground text-xs font-medium">👤 {conv.agent_name}</span>
+                    <span className="truncate text-foreground text-xs font-medium bg-muted px-2 py-0.5 rounded-full">
+                      👤 {conv.agent_name}
+                    </span>
                   )}
                 </div>
               </div>
             </div>
-          </button>
+          </div>
         ))}
       </div>
       </ScrollArea>
