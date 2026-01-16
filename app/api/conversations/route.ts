@@ -40,48 +40,150 @@ export async function GET(request: Request) {
     const status = searchParams.get("status") || "all"
     const userRole = user.role
 
-    // Build WHERE clause based on user role
-    let whereClause = ""
+    let conversations
+
+    // Build query based on user role and status
     if (userRole === "Administrador") {
       // Admin can see all conversations
-      whereClause = ""
+      if (status === "all") {
+        conversations = await sql`
+          SELECT 
+            c.id,
+            c.status,
+            c.priority,
+            c.last_message_at,
+            c.assigned_agent_id,
+            c.contact_id,
+            contacts.name as contact_name,
+            contacts.phone_number,
+            contacts.avatar_url as contact_avatar,
+            u.name as agent_name,
+            (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+            (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
+          FROM conversations c
+          LEFT JOIN contacts ON c.contact_id = contacts.id
+          LEFT JOIN users u ON c.assigned_agent_id = u.id
+          ORDER BY c.last_message_at DESC
+          LIMIT 50
+        `
+      } else {
+        conversations = await sql`
+          SELECT 
+            c.id,
+            c.status,
+            c.priority,
+            c.last_message_at,
+            c.assigned_agent_id,
+            c.contact_id,
+            contacts.name as contact_name,
+            contacts.phone_number,
+            contacts.avatar_url as contact_avatar,
+            u.name as agent_name,
+            (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+            (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
+          FROM conversations c
+          LEFT JOIN contacts ON c.contact_id = contacts.id
+          LEFT JOIN users u ON c.assigned_agent_id = u.id
+          WHERE c.status = ${status}
+          ORDER BY c.last_message_at DESC
+          LIMIT 50
+        `
+      }
     } else if (userRole === "Agente") {
       // Agent can only see conversations assigned to them
-      whereClause = `WHERE c.assigned_agent_id = ${user.id}`
+      if (status === "all") {
+        conversations = await sql`
+          SELECT 
+            c.id,
+            c.status,
+            c.priority,
+            c.last_message_at,
+            c.assigned_agent_id,
+            c.contact_id,
+            contacts.name as contact_name,
+            contacts.phone_number,
+            contacts.avatar_url as contact_avatar,
+            u.name as agent_name,
+            (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+            (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
+          FROM conversations c
+          LEFT JOIN contacts ON c.contact_id = contacts.id
+          LEFT JOIN users u ON c.assigned_agent_id = u.id
+          WHERE c.assigned_agent_id = ${user.id}
+          ORDER BY c.last_message_at DESC
+          LIMIT 50
+        `
+      } else {
+        conversations = await sql`
+          SELECT 
+            c.id,
+            c.status,
+            c.priority,
+            c.last_message_at,
+            c.assigned_agent_id,
+            c.contact_id,
+            contacts.name as contact_name,
+            contacts.phone_number,
+            contacts.avatar_url as contact_avatar,
+            u.name as agent_name,
+            (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+            (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
+          FROM conversations c
+          LEFT JOIN contacts ON c.contact_id = contacts.id
+          LEFT JOIN users u ON c.assigned_agent_id = u.id
+          WHERE c.assigned_agent_id = ${user.id} AND c.status = ${status}
+          ORDER BY c.last_message_at DESC
+          LIMIT 50
+        `
+      }
     } else {
       // Regular users can see their own conversations
-      whereClause = `WHERE c.contact_id IN (SELECT id FROM contacts WHERE created_by_user_id = ${user.id})`
+      if (status === "all") {
+        conversations = await sql`
+          SELECT 
+            c.id,
+            c.status,
+            c.priority,
+            c.last_message_at,
+            c.assigned_agent_id,
+            c.contact_id,
+            contacts.name as contact_name,
+            contacts.phone_number,
+            contacts.avatar_url as contact_avatar,
+            u.name as agent_name,
+            (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+            (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
+          FROM conversations c
+          LEFT JOIN contacts ON c.contact_id = contacts.id
+          LEFT JOIN users u ON c.assigned_agent_id = u.id
+          WHERE c.contact_id IN (SELECT id FROM contacts WHERE created_by_user_id = ${user.id})
+          ORDER BY c.last_message_at DESC
+          LIMIT 50
+        `
+      } else {
+        conversations = await sql`
+          SELECT 
+            c.id,
+            c.status,
+            c.priority,
+            c.last_message_at,
+            c.assigned_agent_id,
+            c.contact_id,
+            contacts.name as contact_name,
+            contacts.phone_number,
+            contacts.avatar_url as contact_avatar,
+            u.name as agent_name,
+            (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+            (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
+          FROM conversations c
+          LEFT JOIN contacts ON c.contact_id = contacts.id
+          LEFT JOIN users u ON c.assigned_agent_id = u.id
+          WHERE c.contact_id IN (SELECT id FROM contacts WHERE created_by_user_id = ${user.id}) AND c.status = ${status}
+          ORDER BY c.last_message_at DESC
+          LIMIT 50
+        `
+      }
     }
-
-    // Add status filter if specified
-    if (status !== "all") {
-      whereClause = whereClause ? `${whereClause} AND c.status = ${status}` : `WHERE c.status = ${status}`
-    }
-
-    let conversations
-    const query = `
-      SELECT 
-        c.id,
-        c.status,
-        c.priority,
-        c.last_message_at,
-        c.assigned_agent_id,
-        c.contact_id,
-        contacts.name as contact_name,
-        contacts.phone_number,
-        contacts.avatar_url as contact_avatar,
-        u.name as agent_name,
-        (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
-        (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
-      FROM conversations c
-      LEFT JOIN contacts ON c.contact_id = contacts.id
-      LEFT JOIN users u ON c.assigned_agent_id = u.id
-      ${whereClause}
-      ORDER BY c.last_message_at DESC
-      LIMIT 50
-    `
-
-    conversations = await sql.unsafe(query)
 
     return NextResponse.json({ conversations })
   } catch (error) {
