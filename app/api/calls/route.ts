@@ -65,6 +65,7 @@ export async function POST(request: NextRequest) {
 
   try {
     await ensureCallsTable()
+    const body = await request.json()
     const {
       contact_name,
       phone_number,
@@ -72,11 +73,21 @@ export async function POST(request: NextRequest) {
       scheduled_at,
       call_type,
       notes,
-    } = await request.json()
+    } = body
+
+    console.log("[POST Calls] Request body:", body)
 
     if (!scheduled_at) {
       return NextResponse.json({ error: "scheduled_at is required" }, { status: 400 })
     }
+
+    // Validar formato de fecha
+    const scheduledDate = new Date(scheduled_at)
+    if (isNaN(scheduledDate.getTime())) {
+      return NextResponse.json({ error: "Invalid date format" }, { status: 400 })
+    }
+
+    console.log("[POST Calls] Creating call for user:", user.id)
 
     const result = await sql!`
       INSERT INTO calls (
@@ -103,9 +114,13 @@ export async function POST(request: NextRequest) {
       RETURNING *
     `
 
+    console.log("[POST Calls] Call created successfully:", result[0])
     return NextResponse.json({ call: result[0] }, { status: 201 })
   } catch (error) {
     console.error("[POST Calls] Error:", error)
-    return NextResponse.json({ error: "Failed to create call" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Failed to create call",
+      details: error instanceof Error ? error.message : "Unknown error"
+    }, { status: 500 })
   }
 }

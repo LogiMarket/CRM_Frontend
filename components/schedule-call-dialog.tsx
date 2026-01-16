@@ -38,32 +38,40 @@ export function ScheduleCallDialog({
 
     setLoading(true)
     try {
+      const payload = {
+        contact_name: contactName,
+        phone_number: phoneNumber,
+        conversation_id: conversationId,
+        scheduled_at: `${callDate}T${callTime}`,
+        call_type: callType,
+        notes: notes.trim(),
+      }
+
+      console.log("[ScheduleCallDialog] Sending payload:", payload)
+
       const response = await fetch("/api/calls", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contact_name: contactName,
-          phone_number: phoneNumber,
-          conversation_id: conversationId,
-          scheduled_at: `${callDate}T${callTime}`,
-          call_type: callType,
-          notes: notes.trim(),
-        }),
+        body: JSON.stringify(payload),
       })
 
+      const data = await response.json()
+      console.log("[ScheduleCallDialog] Response:", data)
+
       if (response.ok) {
-        alert("Llamada agendada correctamente")
+        alert("✅ Llamada agendada correctamente")
         onOpenChange(false)
         setCallDate("")
         setCallTime("")
         setCallType("phone")
         setNotes("")
       } else {
-        alert("Error al agendar la llamada")
+        alert(`❌ Error: ${data.error || "No se pudo agendar"}`)
+        console.error("[ScheduleCallDialog] Error details:", data)
       }
     } catch (error) {
-      console.error("Error scheduling call:", error)
-      alert("Error al agendar la llamada")
+      console.error("[ScheduleCallDialog] Error scheduling call:", error)
+      alert("❌ Error de conexión al agendar la llamada")
     } finally {
       setLoading(false)
     }
