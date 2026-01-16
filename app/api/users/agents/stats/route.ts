@@ -9,6 +9,8 @@ export async function GET() {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
     }
 
+    console.log("[Agents Stats] Fetching agent statistics...")
+
     // Get count of active conversations per agent
     const result = await sql!`
       SELECT 
@@ -16,8 +18,8 @@ export async function GET() {
         u.name,
         u.email,
         r.name as role_name,
-        COUNT(c.id) FILTER (WHERE c.status IN ('open', 'assigned')) as active_count,
-        COUNT(c.id) FILTER (WHERE c.status = 'resolved') as resolved_count,
+        COUNT(CASE WHEN c.status IN ('open', 'assigned') THEN 1 END) as active_count,
+        COUNT(CASE WHEN c.status = 'resolved' THEN 1 END) as resolved_count,
         COUNT(c.id) as total_count
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
@@ -27,8 +29,10 @@ export async function GET() {
       ORDER BY u.name
     `
 
+    console.log("[Agents Stats] Query result:", result.length, "agents")
+
     const agents = result.map((row: any) => ({
-      id: row.id,
+      id: String(row.id),
       name: row.name,
       email: row.email,
       role: row.role_name,
@@ -37,9 +41,14 @@ export async function GET() {
       total_conversations: parseInt(row.total_count) || 0,
     }))
 
+    console.log("[Agents Stats] Mapped agents:", agents)
+
     return NextResponse.json({ agents })
   } catch (error) {
     console.error("[Agents Stats] Error:", error)
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+    return NextResponse.json({ 
+      error: "Internal server error", 
+      details: error instanceof Error ? error.message : String(error) 
+    }, { status: 500 })
   }
 }
