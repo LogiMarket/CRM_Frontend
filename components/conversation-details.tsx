@@ -205,11 +205,11 @@ export function ConversationDetails({
 
       {/* Content */}
       <ScrollArea className="flex-1">
-        <div className="space-y-2 sm:space-y-4 p-2 sm:p-4">
+        <div className="space-y-1.5 sm:space-y-3 p-2 sm:p-3">
           {/* Contact Info */}
           <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/10">
-            <CardHeader className="pb-2 pt-3 px-3 sm:px-4">
-              <CardTitle className="text-xs sm:text-sm flex items-center gap-2 truncate">
+            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+              <CardTitle className="text-xs flex items-center gap-1 truncate">
                 <span>📱</span> <span className="truncate">{contact_name || "Contacto"}</span>
               </CardTitle>
               <CardDescription className="text-xs text-blue-700 dark:text-blue-300 truncate">
@@ -220,9 +220,9 @@ export function ConversationDetails({
 
           {/* Status Section */}
           <Card className={`border-l-4 ${getStatusColor(currentStatus)} shadow-sm hover:shadow-md transition-shadow`}>
-            <CardHeader className="pb-2 pt-3 px-3 sm:px-4">
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="text-xs sm:text-sm font-bold flex items-center gap-2 truncate">
+            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+              <div className="flex items-center justify-between gap-1">
+                <CardTitle className="text-xs font-bold flex items-center gap-1 truncate">
                   <span>{getStatusIcon(currentStatus)}</span>
                   Estado
                 </CardTitle>
@@ -231,9 +231,9 @@ export function ConversationDetails({
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-2 px-3 sm:px-4 pb-3">
+            <CardContent className="space-y-1 px-2 sm:px-3 pb-2">
               <Select value={currentStatus} onValueChange={handleStatusChange} disabled={loading}>
-                <SelectTrigger className="h-8 sm:h-9 text-xs shadow-sm hover:shadow-md transition-shadow">
+                <SelectTrigger className="h-8 text-xs shadow-sm hover:shadow-md transition-shadow">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,14 +250,14 @@ export function ConversationDetails({
 
           {/* Priority */}
           <Card className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="pb-2 pt-3 px-3 sm:px-4">
-              <CardTitle className="text-xs sm:text-sm font-bold flex items-center gap-2">
+            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+              <CardTitle className="text-xs font-bold flex items-center gap-1">
                 <span>⚡</span> Prioridad
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 px-3 sm:px-4 pb-3">
+            <CardContent className="space-y-1 px-2 sm:px-3 pb-2">
               <Select value={currentPriority} onValueChange={handlePriorityChange} disabled={loading}>
-                <SelectTrigger className="h-8 sm:h-9 text-xs shadow-sm hover:shadow-md transition-shadow">
+                <SelectTrigger className="h-8 text-xs shadow-sm hover:shadow-md transition-shadow">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -272,13 +272,13 @@ export function ConversationDetails({
           {/* Agent Info */}
           {agent_name && (
             <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-purple-50 to-purple-50/50 dark:from-purple-950/30 dark:to-purple-950/10">
-              <CardHeader className="pb-2 pt-3 px-3 sm:px-4">
-                <CardTitle className="text-xs sm:text-sm font-bold flex items-center gap-2">
-                  <span>👤</span> Agente Asignado
+              <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+                <CardTitle className="text-xs font-bold flex items-center gap-1">
+                  <span>👤</span> Agente
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-3 sm:px-4 pb-3">
-                <div className="text-xs sm:text-sm font-semibold text-purple-700 dark:text-purple-300 truncate">
+              <CardContent className="px-2 sm:px-3 pb-2">
+                <div className="text-xs font-semibold text-purple-700 dark:text-purple-300 truncate">
                   {agent_name}
                 </div>
               </CardContent>
@@ -287,14 +287,14 @@ export function ConversationDetails({
 
           {/* Timeline */}
           <Card className="border-l-4 border-l-gray-400 shadow-sm">
-            <CardHeader className="pb-2 pt-3 px-3 sm:px-4">
-              <CardTitle className="text-xs sm:text-sm font-bold flex items-center gap-2">
+            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+              <CardTitle className="text-xs font-bold flex items-center gap-1">
                 <span>📅</span> Timeline
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-1 sm:space-y-2 text-xs px-3 sm:px-4 pb-3">
+            <CardContent className="space-y-0.5 text-xs px-2 sm:px-3 pb-2">
               {created_at && (
-                <div className="flex justify-between gap-2">
+                <div className="flex justify-between gap-1">
                   <span className="text-muted-foreground truncate">Creada:</span>
                   <span className="font-medium text-right text-xs">
                     {format(new Date(created_at), "dd MMM", { locale: es })}
@@ -302,8 +302,8 @@ export function ConversationDetails({
                 </div>
               )}
               {last_message_at && (
-                <div className="flex justify-between gap-2">
-                  <span className="text-muted-foreground truncate">Último msg:</span>
+                <div className="flex justify-between gap-1">
+                  <span className="text-muted-foreground truncate">Último:</span>
                   <span className="font-medium text-right text-xs">
                     {format(new Date(last_message_at), "dd MMM", { locale: es })}
                   </span>
@@ -315,15 +315,15 @@ export function ConversationDetails({
           {/* Timestamps */}
           {/* Comments */}
           <Card className="border-l-4 border-l-indigo-500 shadow-sm">
-            <CardHeader className="pb-2 pt-3 px-3 sm:px-4">
-              <CardTitle className="text-xs sm:text-sm font-bold flex items-center gap-2">
+            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+              <CardTitle className="text-xs font-bold flex items-center gap-1">
                 <span>💬</span> Comentarios
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 px-3 sm:px-4 pb-3">
+            <CardContent className="space-y-1 px-2 sm:px-3 pb-2">
               {comments && (
-                <div className="rounded-md bg-muted p-2 max-h-24 sm:max-h-32 overflow-y-auto">
-                  <div className="text-xs text-foreground whitespace-pre-wrap break-words space-y-1">
+                <div className="rounded-md bg-muted p-1.5 max-h-20 overflow-y-auto">
+                  <div className="text-xs text-foreground whitespace-pre-wrap break-words space-y-0.5">
                     {comments.split("\n").map((line, i) => (
                       <p key={i}>{line}</p>
                     ))}
@@ -332,10 +332,10 @@ export function ConversationDetails({
               )}
               
               <Textarea
-                placeholder="Agregar comentario..."
+                placeholder="Comentario..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="resize-none h-16 sm:h-20 text-xs"
+                className="resize-none h-14 text-xs"
                 disabled={loading || commentsLoading}
               />
 
@@ -343,7 +343,7 @@ export function ConversationDetails({
                 onClick={handleAddComment}
                 disabled={!newComment.trim() || loading || commentsLoading}
                 size="sm"
-                className="w-full gap-2 text-xs sm:text-sm"
+                className="w-full gap-1 text-xs"
               >
                 <CheckCircle className="h-3 w-3" />
                 {loading || commentsLoading ? "Guardando..." : "Guardar"}

@@ -130,7 +130,7 @@ export default function InboxPage() {
 
         {/* Orders/Details panel - responsive */}
         {showOrdersPanel && (
-          <div className="hidden xl:flex h-full w-full xl:w-80 2xl:w-96 flex-col border-l border-border bg-card flex-shrink-0 overflow-hidden">
+          <div className="hidden xl:flex h-full w-full xl:w-96 2xl:w-[28rem] flex-col border-l border-border bg-card flex-shrink-0 overflow-hidden">
               <OrdersPanel 
                 conversationDetails={conversationDetails}
                 onUpdate={handleUpdate}
