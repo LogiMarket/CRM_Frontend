@@ -306,7 +306,7 @@ export function ConversationDetails({
                 <span>📱</span> <span className="truncate">{contact_name || "Contacto"}</span>
               </CardTitle>
               <CardDescription className="text-xs text-blue-700 dark:text-blue-300 truncate">
-                {contact_name && phone_number ? `${contact_name} ${phone_number}` : phone_number || "Sin número"}
+                {phone_number || "Sin número"}
               </CardDescription>
             </CardHeader>
           </Card>
