@@ -14,6 +14,7 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { MacrosDialog } from "./macros-dialog"
 import { AssignAgentDialog } from "./assign-agent-dialog"
+import { ScheduleCallDialog } from "./schedule-call-dialog"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -43,6 +44,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
   const [sending, setSending] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
   const [editingContent, setEditingContent] = useState("")
+  const [scheduleCallOpen, setScheduleCallOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -252,13 +254,24 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem>Agendar llamada</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setScheduleCallOpen(true)}>
+                Agendar llamada
+              </DropdownMenuItem>
               <DropdownMenuItem>Enviar encuesta</DropdownMenuItem>
               <DropdownMenuItem>Transferir conversación</DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
+
+      {/* Schedule Call Dialog */}
+      <ScheduleCallDialog
+        open={scheduleCallOpen}
+        onOpenChange={setScheduleCallOpen}
+        contactName={contactName}
+        phoneNumber=""
+        conversationId={conversationId}
+      />
 
       {/* Messages */}
       <div 
