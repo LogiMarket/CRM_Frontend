@@ -13,9 +13,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
-import { Info, MessageSquare, CheckCircle } from "lucide-react"
+import { Info, MessageSquare, CheckCircle, Trash2, Edit2 } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+
+interface Comment {
+  id: string
+  text: string
+  created_at: string
+}
 
 interface ConversationDetailsProps {
   conversationId?: string | number
@@ -42,13 +48,15 @@ export function ConversationDetails({
   onUpdate,
   onAgentChange,
 }: ConversationDetailsProps) {
-  const [comments, setComments] = useState("")
+  const [comments, setComments] = useState<Comment[]>([])
   const [newComment, setNewComment] = useState("")
   const [currentStatus, setCurrentStatus] = useState(status)
   const [currentPriority, setCurrentPriority] = useState(priority)
   const [currentAgentName, setCurrentAgentName] = useState(agent_name)
   const [loading, setLoading] = useState(false)
   const [commentsLoading, setCommentsLoading] = useState(false)
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editingText, setEditingText] = useState("")
 
   useEffect(() => {
     setCurrentStatus(status)
@@ -71,7 +79,17 @@ export function ConversationDetails({
         const response = await fetch(`/api/conversations/${conversationId}`)
         if (response.ok) {
           const data = await response.json()
-          setComments(data.comments || "")
+          if (data.comments) {
+            try {
+              const parsed = JSON.parse(data.comments)
+              setComments(Array.isArray(parsed) ? parsed : [])
+            } catch {
+              // Old format - plain text, convert to empty array
+              setComments([])
+            }
+          } else {
+            setComments([])
+          }
         }
       } catch (error) {
         console.error("[ConversationDetails] Error loading comments:", error)
@@ -189,12 +207,61 @@ export function ConversationDetails({
       })
 
       if (response.ok) {
-        setComments((prev) => `${prev}\n${newComment}`)
+        const data = await response.json()
+        setComments(data.comments)
         setNewComment("")
         onUpdate?.()
       }
     } catch (error) {
       console.error("[ConversationDetails] Error adding comment:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!conversationId) return
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/comments`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commentId }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setComments(data.comments)
+        onUpdate?.()
+      }
+    } catch (error) {
+      console.error("[ConversationDetails] Error deleting comment:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditComment = async (commentId: string) => {
+    if (!editingText.trim() || !conversationId) return
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/comments`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commentId, text: editingText }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setComments(data.comments)
+        setEditingCommentId(null)
+        setEditingText("")
+        onUpdate?.()
+      }
+    } catch (error) {
+      console.error("[ConversationDetails] Error editing comment:", error)
     } finally {
       setLoading(false)
     }
@@ -332,13 +399,79 @@ export function ConversationDetails({
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-2 px-2 sm:px-3 pb-2">
-              {comments && (
-                <div className="rounded-md bg-muted p-2 max-h-24 overflow-y-auto">
-                  <div className="text-xs text-foreground whitespace-pre-wrap break-words">
-                    {comments.split("\n").map((line, i) => (
-                      <p key={i} className="mb-1">{line}</p>
-                    ))}
-                  </div>
+              {comments.length > 0 && (
+                <div className="space-y-2 max-h-40 overflow-y-auto rounded-md border border-border p-2 bg-muted/50">
+                  {comments.map((comment) => (
+                    <div
+                      key={comment.id}
+                      className="bg-background p-2 rounded border border-border text-xs space-y-1"
+                    >
+                      {editingCommentId === comment.id ? (
+                        <>
+                          <Textarea
+                            value={editingText}
+                            onChange={(e) => setEditingText(e.target.value)}
+                            className="resize-none h-16 text-xs"
+                            disabled={loading}
+                          />
+                          <div className="flex gap-1 justify-end">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setEditingCommentId(null)
+                                setEditingText("")
+                              }}
+                              disabled={loading}
+                              className="h-7 text-xs"
+                            >
+                              Cancelar
+                            </Button>
+                            <Button
+                              size="sm"
+                              onClick={() => handleEditComment(comment.id)}
+                              disabled={!editingText.trim() || loading}
+                              className="h-7 text-xs"
+                            >
+                              Guardar
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-foreground break-words">{comment.text}</p>
+                          <div className="flex items-center justify-between gap-2 pt-1">
+                            <span className="text-muted-foreground text-xs">
+                              {format(new Date(comment.created_at), "dd MMM HH:mm", { locale: es })}
+                            </span>
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => {
+                                  setEditingCommentId(comment.id)
+                                  setEditingText(comment.text)
+                                }}
+                                disabled={loading}
+                                className="h-6 w-6 p-0"
+                              >
+                                <Edit2 className="h-3 w-3" />
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => handleDeleteComment(comment.id)}
+                                disabled={loading}
+                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                              >
+                                <Trash2 className="h-3 w-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
                 </div>
               )}
               
@@ -347,12 +480,12 @@ export function ConversationDetails({
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
                 className="resize-none h-20 text-sm"
-                disabled={loading || commentsLoading}
+                disabled={loading || commentsLoading || editingCommentId !== null}
               />
 
               <Button
                 onClick={handleAddComment}
-                disabled={!newComment.trim() || loading || commentsLoading}
+                disabled={!newComment.trim() || loading || commentsLoading || editingCommentId !== null}
                 size="sm"
                 className="w-full gap-1 text-sm h-9"
               >
