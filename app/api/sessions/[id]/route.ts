@@ -2,6 +2,27 @@ import { sql } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/session"
 
+const ensureSessionsTable = async () => {
+  if (!sql) throw new Error("Database not configured")
+  await sql!`
+    CREATE TABLE IF NOT EXISTS user_sessions (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      user_name TEXT NOT NULL,
+      user_email TEXT NOT NULL,
+      session_type VARCHAR(30) DEFAULT 'consultation',
+      duration_minutes INTEGER DEFAULT 30,
+      notes TEXT,
+      outcomes TEXT,
+      session_date TIMESTAMP NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_sessions_agent ON user_sessions(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_sessions_date ON user_sessions(session_date);
+  `
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -22,6 +43,7 @@ export async function PUT(
   } = await request.json()
 
   try {
+    await ensureSessionsTable()
     const result = await sql!`
       UPDATE user_sessions 
       SET 
@@ -59,6 +81,7 @@ export async function DELETE(
   const { id } = await params
 
   try {
+    await ensureSessionsTable()
     const result = await sql!`
       DELETE FROM user_sessions 
       WHERE id = ${id} AND agent_id = ${user.id}

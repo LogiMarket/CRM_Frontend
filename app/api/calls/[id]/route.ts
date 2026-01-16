@@ -2,6 +2,28 @@ import { sql } from "@/lib/db"
 import { NextRequest, NextResponse } from "next/server"
 import { getSession } from "@/lib/session"
 
+const ensureCallsTable = async () => {
+  if (!sql) throw new Error("Database not configured")
+  await sql!`
+    CREATE TABLE IF NOT EXISTS calls (
+      id SERIAL PRIMARY KEY,
+      agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+      conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+      contact_name TEXT,
+      phone_number TEXT,
+      scheduled_at TIMESTAMP NOT NULL,
+      call_type VARCHAR(20) DEFAULT 'phone',
+      notes TEXT,
+      status VARCHAR(20) DEFAULT 'pending',
+      created_at TIMESTAMP DEFAULT NOW(),
+      updated_at TIMESTAMP DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS idx_calls_agent ON calls(agent_id);
+    CREATE INDEX IF NOT EXISTS idx_calls_conversation ON calls(conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(status);
+  `
+}
+
 export async function PUT(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
@@ -15,6 +37,7 @@ export async function PUT(
   const { status } = await request.json()
 
   try {
+    await ensureCallsTable()
     const result = await sql!`
       UPDATE calls 
       SET status = ${status}, updated_at = NOW() 
@@ -45,6 +68,7 @@ export async function DELETE(
   const { id } = await params
 
   try {
+    await ensureCallsTable()
     const result = await sql!`
       DELETE FROM calls 
       WHERE id = ${id}
