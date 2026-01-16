@@ -16,7 +16,7 @@ export async function GET(
     let result: any = await sql!`
       SELECT 
         id, 
-        status::text as status, 
+        status, 
         priority, 
         contact_id,
         assigned_agent_id,
@@ -31,7 +31,7 @@ export async function GET(
       result = await sql!`
         SELECT 
           id, 
-          status::text as status, 
+          status, 
           priority, 
           contact_id,
           assigned_agent_id,
