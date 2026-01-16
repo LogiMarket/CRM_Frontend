@@ -1,6 +1,7 @@
 "use client"
 
 import { ConversationDetails } from "@/components/conversation-details"
+import { useState } from "react"
 
 interface OrdersPanelProps {
   conversationDetails?: any
@@ -8,17 +9,24 @@ interface OrdersPanelProps {
 }
 
 export function OrdersPanel({ conversationDetails, onUpdate }: OrdersPanelProps) {
+  const [currentAgentName, setCurrentAgentName] = useState(conversationDetails?.agent_name)
+
+  const handleAgentChange = (agentId: string, agentName: string) => {
+    setCurrentAgentName(agentName)
+  }
+
   return (
     <ConversationDetails
       conversationId={conversationDetails?.id}
       status={conversationDetails?.status}
       priority={conversationDetails?.priority}
-      agent_name={conversationDetails?.agent_name}
+      agent_name={currentAgentName}
       created_at={conversationDetails?.created_at}
       last_message_at={conversationDetails?.last_message_at}
       contact_name={conversationDetails?.contact_name}
       phone_number={conversationDetails?.phone_number}
       onUpdate={onUpdate}
+      onAgentChange={handleAgentChange}
     />
   )
 }

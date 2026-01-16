@@ -27,6 +27,7 @@ interface ConversationDetailsProps {
   contact_name?: string
   phone_number?: string
   onUpdate?: () => void
+  onAgentChange?: (agentId: string, agentName: string) => void
 }
 
 export function ConversationDetails({
@@ -44,6 +45,7 @@ export function ConversationDetails({
   const [newComment, setNewComment] = useState("")
   const [currentStatus, setCurrentStatus] = useState(status)
   const [currentPriority, setCurrentPriority] = useState(priority)
+  const [currentAgentName, setCurrentAgentName] = useState(agent_name)
   const [loading, setLoading] = useState(false)
   const [commentsLoading, setCommentsLoading] = useState(false)
 
@@ -54,6 +56,10 @@ export function ConversationDetails({
   useEffect(() => {
     setCurrentPriority(priority)
   }, [priority])
+
+  useEffect(() => {
+    setCurrentAgentName(agent_name)
+  }, [agent_name])
 
   useEffect(() => {
     if (!conversationId) return
@@ -213,7 +219,7 @@ export function ConversationDetails({
                 <span>📱</span> <span className="truncate">{contact_name || "Contacto"}</span>
               </CardTitle>
               <CardDescription className="text-xs text-blue-700 dark:text-blue-300 truncate">
-                {phone_number || "Sin número"}
+                {contact_name && phone_number ? `${contact_name} ${phone_number}` : phone_number || "Sin número"}
               </CardDescription>
             </CardHeader>
           </Card>
@@ -270,7 +276,7 @@ export function ConversationDetails({
           </Card>
 
           {/* Agent Info */}
-          {agent_name && (
+          {currentAgentName && (
             <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-purple-50 to-purple-50/50 dark:from-purple-950/30 dark:to-purple-950/10">
               <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
                 <CardTitle className="text-xs font-bold flex items-center gap-1">
@@ -279,7 +285,7 @@ export function ConversationDetails({
               </CardHeader>
               <CardContent className="px-2 sm:px-3 pb-2">
                 <div className="text-xs font-semibold text-purple-700 dark:text-purple-300 truncate">
-                  {agent_name}
+                  {currentAgentName}
                 </div>
               </CardContent>
             </Card>

@@ -27,7 +27,7 @@ interface Agent {
 interface AssignAgentDialogProps {
   conversationId: string
   currentAgentId?: string
-  onAssign: () => void
+  onAssign: (agentName?: string) => void
 }
 
 export function AssignAgentDialog({ conversationId, currentAgentId, onAssign }: AssignAgentDialogProps) {
@@ -36,6 +36,7 @@ export function AssignAgentDialog({ conversationId, currentAgentId, onAssign }: 
   const { agents, loading: loadingAgents } = useAgents()
 
   const handleAssign = async (agentId: string) => {
+    const agent = agents.find(a => a.id === agentId)
     setLoading(true)
     try {
       console.log("[AssignAgentDialog] Assigning agent", agentId, "to conversation", conversationId)
@@ -51,7 +52,7 @@ export function AssignAgentDialog({ conversationId, currentAgentId, onAssign }: 
       if (response.ok) {
         const result = await response.json()
         console.log("[AssignAgentDialog] Assignment successful:", result)
-        onAssign()
+        onAssign(agent?.name)
         setOpen(false)
       } else {
         const error = await response.json()
