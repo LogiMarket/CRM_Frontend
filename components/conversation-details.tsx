@@ -312,30 +312,29 @@ export function ConversationDetails({
             </CardContent>
           </Card>
 
-          {/* Timestamps */}
           {/* Comments */}
           <Card className="border-l-4 border-l-indigo-500 shadow-sm">
-            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
-              <CardTitle className="text-xs font-bold flex items-center gap-1">
+            <CardHeader className="pb-2 pt-2 px-2 sm:px-3">
+              <CardTitle className="text-sm font-bold flex items-center gap-1">
                 <span>💬</span> Comentarios
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-1 px-2 sm:px-3 pb-2">
+            <CardContent className="space-y-2 px-2 sm:px-3 pb-2">
               {comments && (
-                <div className="rounded-md bg-muted p-1.5 max-h-20 overflow-y-auto">
-                  <div className="text-xs text-foreground whitespace-pre-wrap break-words space-y-0.5">
+                <div className="rounded-md bg-muted p-2 max-h-24 overflow-y-auto">
+                  <div className="text-xs text-foreground whitespace-pre-wrap break-words">
                     {comments.split("\n").map((line, i) => (
-                      <p key={i}>{line}</p>
+                      <p key={i} className="mb-1">{line}</p>
                     ))}
                   </div>
                 </div>
               )}
               
               <Textarea
-                placeholder="Comentario..."
+                placeholder="Escribe un comentario..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="resize-none h-14 text-xs"
+                className="resize-none h-20 text-sm"
                 disabled={loading || commentsLoading}
               />
 
@@ -343,7 +342,7 @@ export function ConversationDetails({
                 onClick={handleAddComment}
                 disabled={!newComment.trim() || loading || commentsLoading}
                 size="sm"
-                className="w-full gap-1 text-xs"
+                className="w-full gap-1 text-sm h-9"
               >
                 <CheckCircle className="h-3 w-3" />
                 {loading || commentsLoading ? "Guardando..." : "Guardar"}
