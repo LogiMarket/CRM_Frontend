@@ -38,32 +38,29 @@ export function AssignAgentDialog({ conversationId, currentAgentId, onAssign }: 
   const handleAssign = async (agentId: string) => {
     setLoading(true)
     try {
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || "https://crmbackend-production-4e4d.up.railway.app"
-      const token = typeof window !== "undefined" ? localStorage.getItem("access_token") : null
+      console.log("[AssignAgentDialog] Assigning agent", agentId, "to conversation", conversationId)
       
-      if (!token) {
-        console.error("No authentication token found")
-        return
-      }
-
-      const response = await fetch(`${backendUrl}/api/conversations/${conversationId}/assign`, {
+      const response = await fetch(`/api/conversations/${conversationId}/assign`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ agent_id: agentId }),
+        body: JSON.stringify({ agentId }),
       })
 
       if (response.ok) {
+        const result = await response.json()
+        console.log("[AssignAgentDialog] Assignment successful:", result)
         onAssign()
         setOpen(false)
       } else {
         const error = await response.json()
-        console.error("Assign error:", error)
+        console.error("[AssignAgentDialog] Assignment failed:", error)
+        alert(`Error al asignar: ${error.error || 'Error desconocido'}`)
       }
     } catch (error) {
-      console.error("Assign agent error:", error)
+      console.error("[AssignAgentDialog] Network error:", error)
+      alert("Error de red al asignar agente")
     } finally {
       setLoading(false)
     }
