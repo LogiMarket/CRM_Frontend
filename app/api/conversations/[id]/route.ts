@@ -20,6 +20,7 @@ export async function GET(
         priority, 
         contact_id,
         assigned_agent_id,
+        comments,
         created_at, 
         last_message_at
       FROM conversations 
@@ -35,6 +36,7 @@ export async function GET(
           priority, 
           contact_id,
           assigned_agent_id,
+          comments,
           created_at, 
           last_message_at
         FROM conversations 
@@ -70,7 +72,7 @@ export async function GET(
       id: conversation.id,
       status: conversation.status,
       priority: conversation.priority,
-      comments: "",
+      comments: conversation.comments || "",
       created_at: conversation.created_at,
       last_message_at: conversation.last_message_at,
       contact_name: contact.name,
