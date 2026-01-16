@@ -289,21 +289,21 @@ export function ConversationDetails({
   return (
     <div className="flex h-full flex-col bg-background border-l border-border">
       {/* Header */}
-      <div className="border-b border-border bg-card p-3 sm:p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Info className="h-4 w-4 text-primary" />
-          <h2 className="font-semibold text-xs sm:text-sm text-foreground">Detalles de la Conversación</h2>
+      <div className="border-b border-border bg-card p-2">
+        <div className="flex items-center gap-2">
+          <Info className="h-3.5 w-3.5 text-primary flex-shrink-0" />
+          <h2 className="font-semibold text-xs text-foreground truncate">Detalles</h2>
         </div>
       </div>
 
       {/* Content */}
       <ScrollArea className="flex-1 overflow-y-auto">
-        <div className="space-y-1.5 sm:space-y-3 p-2 sm:p-3 pb-8">
+        <div className="space-y-1 p-2 pb-8">
           {/* Contact Info */}
           <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/10">
-            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+            <CardHeader className="pb-1 pt-1.5 px-2">
               <CardTitle className="text-xs flex items-center gap-1 truncate">
-                <span>📱</span> <span className="truncate">{contact_name || "Contacto"}</span>
+                <span>📱</span> <span className="truncate text-xs font-semibold">{contact_name || "Contacto"}</span>
               </CardTitle>
               <CardDescription className="text-xs text-blue-700 dark:text-blue-300 truncate">
                 {phone_number || "Sin número"}
@@ -312,21 +312,21 @@ export function ConversationDetails({
           </Card>
 
           {/* Status Section */}
-          <Card className={`border-l-4 ${getStatusColor(currentStatus)} shadow-sm hover:shadow-md transition-shadow`}>
-            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+          <Card className={`border-l-4 ${getStatusColor(currentStatus)} shadow-sm`}>
+            <CardHeader className="pb-1 pt-1.5 px-2">
               <div className="flex items-center justify-between gap-1">
                 <CardTitle className="text-xs font-bold flex items-center gap-1 truncate">
                   <span>{getStatusIcon(currentStatus)}</span>
                   Estado
                 </CardTitle>
-                <Badge className={`${getStatusBadgeColor(currentStatus)} border text-xs`}>
+                <Badge className={`${getStatusBadgeColor(currentStatus)} border text-xs h-5`}>
                   {getStatusLabel(currentStatus)}
                 </Badge>
               </div>
             </CardHeader>
-            <CardContent className="space-y-1 px-2 sm:px-3 pb-2">
+            <CardContent className="space-y-1 px-2 pb-1.5">
               <Select value={currentStatus} onValueChange={handleStatusChange} disabled={loading}>
-                <SelectTrigger className="h-8 text-xs shadow-sm hover:shadow-md transition-shadow">
+                <SelectTrigger className="h-7 text-xs shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -342,15 +342,15 @@ export function ConversationDetails({
           </Card>
 
           {/* Priority */}
-          <Card className="border-l-4 border-l-orange-500 shadow-sm hover:shadow-md transition-shadow">
-            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+          <Card className="border-l-4 border-l-orange-500 shadow-sm">
+            <CardHeader className="pb-1 pt-1.5 px-2">
               <CardTitle className="text-xs font-bold flex items-center gap-1">
                 <span>⚡</span> Prioridad
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-1 px-2 sm:px-3 pb-2">
+            <CardContent className="space-y-1 px-2 pb-1.5">
               <Select value={currentPriority} onValueChange={handlePriorityChange} disabled={loading}>
-                <SelectTrigger className="h-8 text-xs shadow-sm hover:shadow-md transition-shadow">
+                <SelectTrigger className="h-7 text-xs shadow-sm">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -365,12 +365,12 @@ export function ConversationDetails({
           {/* Agent Info */}
           {currentAgentName && (
             <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-purple-50 to-purple-50/50 dark:from-purple-950/30 dark:to-purple-950/10">
-              <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+              <CardHeader className="pb-1 pt-1.5 px-2">
                 <CardTitle className="text-xs font-bold flex items-center gap-1">
                   <span>👤</span> Agente
                 </CardTitle>
               </CardHeader>
-              <CardContent className="px-2 sm:px-3 pb-2">
+              <CardContent className="px-2 pb-1.5">
                 <div className="text-xs font-semibold text-purple-700 dark:text-purple-300 truncate">
                   {currentAgentName}
                 </div>
@@ -380,15 +380,15 @@ export function ConversationDetails({
 
           {/* Timeline */}
           <Card className="border-l-4 border-l-gray-400 shadow-sm">
-            <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
+            <CardHeader className="pb-1 pt-1.5 px-2">
               <CardTitle className="text-xs font-bold flex items-center gap-1">
                 <span>📅</span> Timeline
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-0.5 text-xs px-2 sm:px-3 pb-2">
+            <CardContent className="space-y-0.5 text-xs px-2 pb-1.5">
               {created_at && (
                 <div className="flex justify-between gap-1">
-                  <span className="text-muted-foreground truncate">Creada:</span>
+                  <span className="text-muted-foreground truncate text-xs">Creada:</span>
                   <span className="font-medium text-right text-xs">
                     {format(new Date(created_at), "dd MMM", { locale: es })}
                   </span>
@@ -396,7 +396,7 @@ export function ConversationDetails({
               )}
               {last_message_at && (
                 <div className="flex justify-between gap-1">
-                  <span className="text-muted-foreground truncate">Último:</span>
+                  <span className="text-muted-foreground truncate text-xs">Último:</span>
                   <span className="font-medium text-right text-xs">
                     {format(new Date(last_message_at), "dd MMM", { locale: es })}
                   </span>
@@ -407,25 +407,25 @@ export function ConversationDetails({
 
           {/* Comments */}
           <Card className="border-l-4 border-l-indigo-500 shadow-sm">
-            <CardHeader className="pb-2 pt-2 px-2 sm:px-3">
-              <CardTitle className="text-sm font-bold flex items-center gap-1">
+            <CardHeader className="pb-1.5 pt-1.5 px-2">
+              <CardTitle className="text-xs font-bold flex items-center gap-1">
                 <span>💬</span> Comentarios
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-2 px-2 sm:px-3 pb-2">
+            <CardContent className="space-y-1.5 px-2 pb-1.5">
               {comments && comments.length > 0 ? (
-                <div className="space-y-2 max-h-40 overflow-y-auto rounded-md border border-border p-2 bg-muted/50">
+                <div className="space-y-1 max-h-32 overflow-y-auto rounded-md border border-border p-1.5 bg-muted/50">
                   {comments.map((comment) => (
                     <div
                       key={comment.id}
-                      className="bg-background p-2 rounded border border-border text-xs space-y-1"
+                      className="bg-background p-1.5 rounded border border-border text-xs space-y-0.5"
                     >
                       {editingCommentId === comment.id ? (
                         <>
                           <Textarea
                             value={editingText}
                             onChange={(e) => setEditingText(e.target.value)}
-                            className="resize-none h-16 text-xs"
+                            className="resize-none h-12 text-xs"
                             disabled={loading}
                           />
                           <div className="flex gap-1 justify-end">
@@ -437,7 +437,7 @@ export function ConversationDetails({
                                 setEditingText("")
                               }}
                               disabled={loading}
-                              className="h-7 text-xs"
+                              className="h-6 text-xs"
                             >
                               Cancelar
                             </Button>
@@ -445,7 +445,7 @@ export function ConversationDetails({
                               size="sm"
                               onClick={() => handleEditComment(comment.id)}
                               disabled={!editingText.trim() || loading}
-                              className="h-7 text-xs"
+                              className="h-6 text-xs"
                             >
                               Guardar
                             </Button>
@@ -453,12 +453,12 @@ export function ConversationDetails({
                         </>
                       ) : (
                         <>
-                          <p className="text-foreground break-words">{comment.text}</p>
-                          <div className="flex items-center justify-between gap-2 pt-1">
+                          <p className="text-foreground break-words text-xs">{comment.text}</p>
+                          <div className="flex items-center justify-between gap-2 pt-0.5">
                             <span className="text-muted-foreground text-xs">
                               {format(new Date(comment.created_at), "dd MMM HH:mm", { locale: es })}
                             </span>
-                            <div className="flex gap-1">
+                            <div className="flex gap-0.5">
                               <Button
                                 size="sm"
                                 variant="ghost"
@@ -467,18 +467,18 @@ export function ConversationDetails({
                                   setEditingText(comment.text)
                                 }}
                                 disabled={loading}
-                                className="h-6 w-6 p-0"
+                                className="h-5 w-5 p-0"
                               >
-                                <Edit2 className="h-3 w-3" />
+                                <Edit2 className="h-2.5 w-2.5" />
                               </Button>
                               <Button
                                 size="sm"
                                 variant="ghost"
                                 onClick={() => handleDeleteComment(comment.id)}
                                 disabled={loading}
-                                className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                                className="h-5 w-5 p-0 text-destructive hover:text-destructive"
                               >
-                                <Trash2 className="h-3 w-3" />
+                                <Trash2 className="h-2.5 w-2.5" />
                               </Button>
                             </div>
                           </div>
@@ -488,14 +488,14 @@ export function ConversationDetails({
                   ))}
                 </div>
               ) : (
-                <p className="text-xs text-muted-foreground py-2">No hay comentarios</p>
+                <p className="text-xs text-muted-foreground py-1">No hay comentarios</p>
               )}
               
               <Textarea
-                placeholder="Escribe un comentario..."
+                placeholder="Comentario..."
                 value={newComment}
                 onChange={(e) => setNewComment(e.target.value)}
-                className="resize-none h-20 text-sm"
+                className="resize-none h-16 text-xs"
                 disabled={loading || commentsLoading || editingCommentId !== null}
               />
 
@@ -503,9 +503,9 @@ export function ConversationDetails({
                 onClick={handleAddComment}
                 disabled={!newComment.trim() || loading || commentsLoading || editingCommentId !== null}
                 size="sm"
-                className="w-full gap-1 text-sm h-9"
+                className="w-full gap-1 text-xs h-7"
               >
-                <CheckCircle className="h-3 w-3" />
+                <CheckCircle className="h-2.5 w-2.5" />
                 {loading || commentsLoading ? "Guardando..." : "Guardar"}
               </Button>
             </CardContent>

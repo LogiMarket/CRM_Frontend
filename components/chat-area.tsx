@@ -7,12 +7,19 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
-import { Send, MoreVertical, Phone, Video } from "lucide-react"
+import { Textarea } from "@/components/ui/textarea"
+import { Send, MoreVertical, Phone, Video, Edit2, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { MacrosDialog } from "./macros-dialog"
 import { AssignAgentDialog } from "./assign-agent-dialog"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface Message {
   id: number
@@ -34,6 +41,8 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
+  const [editingContent, setEditingContent] = useState("")
   const scrollRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -129,6 +138,52 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
     setNewMessage(content)
   }
 
+  const handleEditMessage = async (messageId: number) => {
+    if (!editingContent.trim() || !conversationId) return
+
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/messages/${messageId}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: editingContent.trim() }),
+      })
+
+      if (response.ok) {
+        setMessages(
+          messages.map((msg) =>
+            msg.id === messageId ? { ...msg, content: editingContent.trim() } : msg
+          )
+        )
+        setEditingMessageId(null)
+        setEditingContent("")
+        onUpdate?.()
+      } else {
+        console.error("Error editing message:", response.status)
+      }
+    } catch (error) {
+      console.error("Error editing message:", error)
+    }
+  }
+
+  const handleDeleteMessage = async (messageId: number) => {
+    if (!conversationId) return
+
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/messages/${messageId}`, {
+        method: "DELETE",
+      })
+
+      if (response.ok) {
+        setMessages(messages.filter((msg) => msg.id !== messageId))
+        onUpdate?.()
+      } else {
+        console.error("Error deleting message:", response.status)
+      }
+    } catch (error) {
+      console.error("Error deleting message:", error)
+    }
+  }
+
   const getInitials = (name: string) => {
     return name
       .split(" ")
@@ -172,15 +227,36 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
               onAssign={(agentId, agentName) => onUpdate?.()}
             />
           )}
-          <Button variant="ghost" size="icon" className="hover:bg-accent transition-colors">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hover:bg-accent transition-colors"
+            onClick={() => console.log("Initiate phone call")}
+            title="Llamada telefónica"
+          >
             <Phone className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="hover:bg-accent transition-colors">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hover:bg-accent transition-colors"
+            onClick={() => console.log("Initiate video call")}
+            title="Videollamada"
+          >
             <Video className="h-5 w-5" />
           </Button>
-          <Button variant="ghost" size="icon" className="hover:bg-accent transition-colors">
-            <MoreVertical className="h-5 w-5" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="hover:bg-accent transition-colors">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem>Agendar llamada</DropdownMenuItem>
+              <DropdownMenuItem>Enviar encuesta</DropdownMenuItem>
+              <DropdownMenuItem>Transferir conversación</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
@@ -205,7 +281,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
               return (
                 <div
                   key={msg.id}
-                  className={cn("flex gap-3 animate-fade-in-up flex-shrink-0", msg.sender_type === "agent" && "flex-row-reverse")}
+                  className={cn("flex gap-3 animate-fade-in-up flex-shrink-0 group", msg.sender_type === "agent" && "flex-row-reverse")}
                   style={{ animationDelay: `${index * 0.05}s` }}
                 >
                   <Avatar className="h-8 w-8 flex-shrink-0">
@@ -219,20 +295,76 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
                     </AvatarFallback>
                   </Avatar>
                   <div className={cn("max-w-[70%] space-y-1", msg.sender_type === "agent" && "items-end")}>
-                    <div
-                      className={cn(
-                        "rounded-lg px-4 py-2 shadow-sm transition-all hover:shadow-md",
-                        msg.sender_type === "agent"
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-card text-foreground border border-border",
-                      )}
-                    >
-                      <p className="text-sm leading-relaxed">{msg.content}</p>
-                    </div>
-                    {showTimestamp && (
-                      <p className="text-muted-foreground text-xs px-1">
-                        {currentTime}
-                      </p>
+                    {editingMessageId === msg.id ? (
+                      <div className="space-y-2">
+                        <Textarea
+                          value={editingContent}
+                          onChange={(e) => setEditingContent(e.target.value)}
+                          className="min-h-20 text-sm rounded-lg"
+                        />
+                        <div className="flex gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingMessageId(null)
+                              setEditingContent("")
+                            }}
+                            className="text-xs h-8"
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleEditMessage(msg.id)}
+                            disabled={!editingContent.trim()}
+                            className="text-xs h-8"
+                          >
+                            Guardar
+                          </Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div
+                          className={cn(
+                            "rounded-lg px-4 py-2 shadow-sm transition-all hover:shadow-md group-hover:ring-2",
+                            msg.sender_type === "agent"
+                              ? "bg-primary text-primary-foreground group-hover:ring-primary/50"
+                              : "bg-card text-foreground border border-border group-hover:ring-muted-foreground/30",
+                          )}
+                        >
+                          <p className="text-sm leading-relaxed">{msg.content}</p>
+                        </div>
+                        {showTimestamp && (
+                          <p className="text-muted-foreground text-xs px-1">
+                            {currentTime}
+                          </p>
+                        )}
+                        {msg.sender_type === "agent" && (
+                          <div className={cn("flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity", msg.sender_type === "agent" && "flex-row-reverse")}>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingMessageId(msg.id)
+                                setEditingContent(msg.content)
+                              }}
+                              className="h-7 w-7 p-0"
+                            >
+                              <Edit2 className="h-3 w-3" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteMessage(msg.id)}
+                              className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-3 w-3" />
+                            </Button>
+                          </div>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
