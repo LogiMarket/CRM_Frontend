@@ -18,9 +18,9 @@ export async function GET() {
         u.name,
         u.email,
         r.name as role_name,
-        COUNT(CASE WHEN c.status IN ('open', 'assigned') THEN 1 END) as active_count,
-        COUNT(CASE WHEN c.status = 'resolved' THEN 1 END) as resolved_count,
-        COUNT(c.id) as total_count
+        COUNT(c.id) as total_count,
+        COUNT(c.id) as active_count,
+        0 as resolved_count
       FROM users u
       LEFT JOIN roles r ON u.role_id = r.id
       LEFT JOIN conversations c ON c.assigned_agent_id = u.id
