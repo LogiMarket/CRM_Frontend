@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
+import { getSession } from "@/lib/session"
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getSession()
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    }
+
     const { id } = await params
 
     if (!id) {
@@ -50,6 +56,23 @@ export async function GET(
     }
 
     const conversation = result[0]
+
+    // Check permissions based on user role
+    if (user.role === "Agente") {
+      // Agents can only access conversations assigned to them
+      if (conversation.assigned_agent_id !== user.id) {
+        return NextResponse.json({ error: "Access denied" }, { status: 403 })
+      }
+    } else if (user.role !== "Administrador") {
+      // Non-admin users (regular contacts/users) can only access their own conversations
+      const contactCheck = await sql!`
+        SELECT id FROM contacts WHERE id = ${conversation.contact_id} AND created_by_user_id = ${user.id}
+      `
+      if (contactCheck.length === 0) {
+        return NextResponse.json({ error: "Access denied" }, { status: 403 })
+      }
+    }
+    // Admins can access all conversations
 
     // Fetch contact info
     let contactResult: any = await sql!`
