@@ -204,8 +204,8 @@ export function ConversationDetails({
       </div>
 
       {/* Content */}
-      <ScrollArea className="flex-1">
-        <div className="space-y-1.5 sm:space-y-3 p-2 sm:p-3">
+      <ScrollArea className="flex-1 overflow-y-auto">
+        <div className="space-y-1.5 sm:space-y-3 p-2 sm:p-3 pb-8">
           {/* Contact Info */}
           <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/10">
             <CardHeader className="pb-1 pt-2 px-2 sm:px-3">
