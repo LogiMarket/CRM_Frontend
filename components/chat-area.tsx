@@ -191,7 +191,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
 
       {/* Messages */}
       <ScrollArea className="flex-1 overflow-hidden" ref={scrollRef}>
-        <div className="space-y-4 p-6 pb-24">
+        <div className="flex flex-col-reverse space-y-4 space-y-reverse p-6">
           {loading ? (
             <p className="text-center text-muted-foreground text-sm">Cargando mensajes...</p>
           ) : messages.length === 0 ? (

@@ -91,11 +91,39 @@ export async function GET(
 
     const agent = agentResult.length > 0 ? agentResult[0] : null
 
+    // Convert old text comments to JSON array if needed
+    let comments = conversation.comments
+    if (comments) {
+      try {
+        // Try to parse as JSON
+        const parsed = JSON.parse(comments)
+        if (!Array.isArray(parsed)) {
+          // If it's not an array, set to empty
+          comments = JSON.stringify([])
+        }
+      } catch {
+        // If it's not JSON, it's old format text - convert to JSON array
+        if (typeof comments === "string" && comments.trim()) {
+          const textComments = comments.split("\n").filter((line: string) => line.trim())
+          const jsonArray = textComments.map((text: string, index: number) => ({
+            id: `${Date.now()}-${index}`,
+            text: text.trim(),
+            created_at: new Date(conversation.created_at).toISOString(),
+          }))
+          comments = JSON.stringify(jsonArray)
+        } else {
+          comments = JSON.stringify([])
+        }
+      }
+    } else {
+      comments = JSON.stringify([])
+    }
+
     return NextResponse.json({
       id: conversation.id,
       status: conversation.status,
       priority: conversation.priority,
-      comments: conversation.comments || "",
+      comments: comments,
       created_at: conversation.created_at,
       last_message_at: conversation.last_message_at,
       contact_name: contact.name,
