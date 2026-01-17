@@ -21,8 +21,8 @@ const ensureCallsTable = async () => {
       await sql!`
         CREATE TABLE calls (
           id SERIAL PRIMARY KEY,
-          agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-          conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+          agent_id UUID REFERENCES users(id) ON DELETE SET NULL,
+          conversation_id UUID REFERENCES conversations(id) ON DELETE SET NULL,
           contact_name TEXT,
           phone_number TEXT,
           scheduled_at TIMESTAMP NOT NULL,
