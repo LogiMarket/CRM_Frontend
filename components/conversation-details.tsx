@@ -18,6 +18,7 @@ import {
   Copy,
   Check,
   MessageSquare,
+  Phone,
   Trash2,
   Edit2,
 } from "lucide-react"
@@ -63,14 +64,12 @@ export function ConversationDetails({
 }: DetailsPanelProps) {
   const [currentStatus, setCurrentStatus] = useState(status)
   const [currentPriority, setCurrentPriority] = useState(priority)
-  const [meetings, setMeetings] = useState<Meeting[]>([
-    { id: 1, title: "Seguimiento pedido", date: "18 ene", time: "10:00", type: "video" },
-  ])
+  const [meetings, setMeetings] = useState<Meeting[]>([])
   const [scheduledSession, setScheduledSession] = useState<{
     title: string
     date: string
     time: string
-    link: string
+    link?: string
   } | null>(null)
   const [copied, setCopied] = useState(false)
   const [comments, setComments] = useState<Comment[]>([])
@@ -121,6 +120,52 @@ export function ConversationDetails({
     }
 
     loadComments()
+  }, [conversationId])
+
+  useEffect(() => {
+    if (!conversationId) return
+
+    const loadCalls = async () => {
+      try {
+        const response = await fetch(`/api/calls?conversation_id=${conversationId}`)
+        const data = await response.json()
+        const mapped: Meeting[] = (data.calls || []).map((call: any) => {
+          const d = new Date(call.scheduled_at)
+          return {
+            id: Number(call.id),
+            title: call.notes?.trim() || "Llamada programada",
+            date: d.toLocaleDateString("es-MX", { day: "2-digit", month: "short" }),
+            time: d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }),
+            type: call.call_type === "video" ? "video" : "phone",
+          }
+        })
+
+        setMeetings(mapped)
+
+        const nextPending = (data.calls || [])
+          .filter((call: any) => call.status !== "completed" && call.status !== "cancelled")
+          .sort((a: any, b: any) => new Date(a.scheduled_at).getTime() - new Date(b.scheduled_at).getTime())[0]
+
+        if (nextPending) {
+          const d = new Date(nextPending.scheduled_at)
+          setScheduledSession({
+            title: nextPending.notes?.trim() || "Llamada programada",
+            date: d.toLocaleDateString("es-MX", { day: "2-digit", month: "short", year: "numeric" }),
+            time: d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }),
+            link: nextPending.meet_link,
+          })
+        } else {
+          setScheduledSession(null)
+        }
+      } catch (error) {
+        console.error("Error loading calls for conversation:", error)
+      }
+    }
+
+    loadCalls()
+    const handler = () => loadCalls()
+    window.addEventListener("calls-updated", handler)
+    return () => window.removeEventListener("calls-updated", handler)
   }, [conversationId])
 
   const handleCopyLink = () => {
@@ -399,7 +444,11 @@ export function ConversationDetails({
                 {meetings.map((meeting) => (
                   <div key={meeting.id} className="bg-green-50 border border-green-200 rounded p-1.5">
                     <div className="flex items-center gap-1.5">
-                      <Video className="h-3 w-3 text-green-600" />
+                      {meeting.type === "video" ? (
+                        <Video className="h-3 w-3 text-green-600" />
+                      ) : (
+                        <Link className="h-3 w-3 text-green-600" />
+                      )}
                       <span className="text-xs font-medium text-green-800 truncate">{meeting.title}</span>
                     </div>
                     <div className="flex items-center justify-between mt-0.5 ml-4.5">

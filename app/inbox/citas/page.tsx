@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { InboxHeader } from "@/components/inbox-header"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -47,59 +47,26 @@ interface Session {
 
 type CalendarView = "day" | "week" | "month"
 
-export default function AgendaPage() {
-  const [sessions, setSessions] = useState<Session[]>([
-    {
-      id: 1,
-      title: "Seguimiento pedido",
-      clientName: "Ana Martínez",
-      clientPhone: "+521 555 123 4567",
-      date: "2026-01-18",
-      time: "10:00",
-      type: "video",
-      status: "scheduled",
-      conversationId: 1,
-      meetLink: "https://meet.google.com/abc-defg-hij",
-    },
-    {
-      id: 2,
-      title: "Consulta de envío",
-      clientName: "Roberto Pérez",
-      clientPhone: "+521 555 987 6543",
-      date: "2026-01-18",
-      time: "14:30",
-      type: "phone",
-      status: "scheduled",
-      conversationId: 2,
-    },
-    {
-      id: 3,
-      title: "Problema con factura",
-      clientName: "Laura Hernández",
-      clientPhone: "+521 555 456 7890",
-      date: "2026-01-17",
-      time: "11:00",
-      type: "video",
-      status: "completed",
-      conversationId: 3,
-      meetLink: "https://meet.google.com/xyz-uvwx-yz",
-    },
-    {
-      id: 4,
-      title: "Soporte técnico",
-      clientName: "Carlos López",
-      clientPhone: "+521 555 111 2222",
-      date: "2026-01-20",
-      time: "16:00",
-      type: "video",
-      status: "scheduled",
-      meetLink: "https://meet.google.com/qrs-tuvw-xyz",
-    },
-  ])
+const getStartOfWeek = (date: Date) => {
+  const d = new Date(date)
+  const day = d.getDay() || 7 // Monday as start
+  d.setHours(0, 0, 0, 0)
+  d.setDate(d.getDate() - (day - 1))
+  return d
+}
 
+export default function AgendaPage() {
+  const today = useMemo(() => {
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    return now
+  }, [])
+
+  const [sessions, setSessions] = useState<Session[]>([])
+  const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<"all" | "scheduled" | "completed" | "cancelled">("all")
-  const [currentWeekStart, setCurrentWeekStart] = useState(new Date("2026-01-13"))
-  const [currentDate, setCurrentDate] = useState(new Date("2026-01-17"))
+  const [currentWeekStart, setCurrentWeekStart] = useState(getStartOfWeek(today))
+  const [currentDate, setCurrentDate] = useState<Date>(today)
   const [calendarView, setCalendarView] = useState<CalendarView>("week")
   const [showNewSessionDialog, setShowNewSessionDialog] = useState(false)
   const [copied, setCopied] = useState(false)
@@ -111,6 +78,51 @@ export default function AgendaPage() {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  const normalizeCallToSession = (call: any): Session => {
+    const dateObj = new Date(call.scheduled_at)
+    const date = dateObj.toISOString().split("T")[0]
+    const time = dateObj.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false })
+
+    return {
+      id: Number(call.id),
+      title: call.notes?.trim() || "Llamada programada",
+      clientName: call.contact_name || "Contacto",
+      clientPhone: call.phone_number || "",
+      date,
+      time,
+      type: (call.call_type === "video" ? "video" : "phone") as Session["type"],
+      status:
+        call.status === "completed"
+          ? "completed"
+          : call.status === "cancelled"
+            ? "cancelled"
+            : "scheduled",
+      conversationId: call.conversation_id,
+      meetLink: call.meet_link || undefined,
+    }
+  }
+
+  const fetchSessions = async () => {
+    setLoading(true)
+    try {
+      const response = await fetch("/api/calls")
+      const data = await response.json()
+      const fetched = (data.calls || []).map(normalizeCallToSession)
+      setSessions(fetched)
+    } catch (error) {
+      console.error("[AgendaPage] Error fetching sessions", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSessions()
+    const handler = () => fetchSessions()
+    window.addEventListener("calls-updated", handler)
+    return () => window.removeEventListener("calls-updated", handler)
+  }, [])
 
   const filteredSessions = filter === "all" ? sessions : sessions.filter((s) => s.status === filter)
 
@@ -135,7 +147,7 @@ export default function AgendaPage() {
         name: dayNames[i],
         date: date.getDate(),
         fullDate: date.toISOString().split("T")[0],
-        isToday: date.toDateString() === new Date("2026-01-17").toDateString(),
+        isToday: date.toDateString() === today.toDateString(),
       })
     }
     return days
@@ -167,7 +179,7 @@ export default function AgendaPage() {
         date: i,
         fullDate: date.toISOString().split("T")[0],
         isCurrentMonth: true,
-        isToday: date.toDateString() === new Date("2026-01-17").toDateString(),
+        isToday: date.toDateString() === today.toDateString(),
       })
     }
 
@@ -239,7 +251,8 @@ export default function AgendaPage() {
     }
   }
 
-  const todaySessions = sessions.filter((s) => s.date === "2026-01-17" && s.status === "scheduled")
+  const todayIso = today.toISOString().split("T")[0]
+  const todaySessions = sessions.filter((s) => s.date === todayIso && s.status === "scheduled")
   const upcomingSessions = sessions.filter((s) => s.status === "scheduled").length
   const completedSessions = sessions.filter((s) => s.status === "completed").length
 
@@ -248,6 +261,12 @@ export default function AgendaPage() {
       <InboxHeader />
 
       <div className="flex-1 overflow-y-auto p-4 lg:p-6 bg-muted/30">
+        {loading ? (
+          <div className="flex items-center justify-center h-64 text-muted-foreground text-sm">
+            Cargando sesiones...
+          </div>
+        ) : (
+          <>
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
           <Card>
@@ -624,6 +643,8 @@ export default function AgendaPage() {
             </CardContent>
           </Card>
         </div>
+        </>
+        )}
       </div>
     </div>
   )

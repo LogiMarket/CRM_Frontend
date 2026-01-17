@@ -60,6 +60,7 @@ export function ScheduleCallDialog({
 
       if (response.ok) {
         alert("✅ Llamada agendada correctamente")
+        window.dispatchEvent(new Event("calls-updated"))
         onOpenChange(false)
         setCallDate("")
         setCallTime("")
