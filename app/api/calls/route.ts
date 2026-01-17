@@ -6,30 +6,44 @@ const ensureCallsTable = async () => {
   if (!sql) throw new Error("Database not configured")
   
   try {
-    // Create table
-    await sql!`
-      CREATE TABLE IF NOT EXISTS calls (
-        id SERIAL PRIMARY KEY,
-        agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
-        conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
-        contact_name TEXT,
-        phone_number TEXT,
-        scheduled_at TIMESTAMP NOT NULL,
-        call_type VARCHAR(20) DEFAULT 'phone',
-        notes TEXT,
-        status VARCHAR(20) DEFAULT 'pending',
-        created_at TIMESTAMP DEFAULT NOW(),
-        updated_at TIMESTAMP DEFAULT NOW()
+    // Check if table exists
+    const tableExists = await sql`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'calls'
       )
     `
     
-    // Create indexes separately
-    await sql!`CREATE INDEX IF NOT EXISTS idx_calls_agent ON calls(agent_id)`
-    await sql!`CREATE INDEX IF NOT EXISTS idx_calls_conversation ON calls(conversation_id)`
-    await sql!`CREATE INDEX IF NOT EXISTS idx_calls_status ON calls(status)`
+    if (!tableExists[0]?.exists) {
+      console.log("[ensureCallsTable] Creating calls table...")
+      
+      // Create table
+      await sql!`
+        CREATE TABLE calls (
+          id SERIAL PRIMARY KEY,
+          agent_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+          conversation_id INTEGER REFERENCES conversations(id) ON DELETE SET NULL,
+          contact_name TEXT,
+          phone_number TEXT,
+          scheduled_at TIMESTAMP NOT NULL,
+          call_type VARCHAR(20) DEFAULT 'phone',
+          notes TEXT,
+          status VARCHAR(20) DEFAULT 'pending',
+          created_at TIMESTAMP DEFAULT NOW(),
+          updated_at TIMESTAMP DEFAULT NOW()
+        )
+      `
+      
+      // Create indexes
+      await sql!`CREATE INDEX idx_calls_agent ON calls(agent_id)`
+      await sql!`CREATE INDEX idx_calls_conversation ON calls(conversation_id)`
+      await sql!`CREATE INDEX idx_calls_status ON calls(status)`
+      
+      console.log("[ensureCallsTable] Table created successfully")
+    }
   } catch (error) {
-    // Table might already exist, continue
-    console.log("[ensureCallsTable] Table check:", error instanceof Error ? error.message : "Unknown error")
+    console.error("[ensureCallsTable] Error:", error instanceof Error ? error.message : "Unknown error")
+    throw error
   }
 }
 
