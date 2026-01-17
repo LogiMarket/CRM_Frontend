@@ -305,22 +305,10 @@ export function ConversationDetails({
                     Activa
                   </div>
                 </SelectItem>
-                <SelectItem value="pending">
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
-                    Pendiente
-                  </div>
-                </SelectItem>
                 <SelectItem value="resolved">
                   <div className="flex items-center gap-1.5">
                     <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
                     Resuelta
-                  </div>
-                </SelectItem>
-                <SelectItem value="closed">
-                  <div className="flex items-center gap-1.5">
-                    <div className="h-1.5 w-1.5 rounded-full bg-gray-500" />
-                    Cerrada
                   </div>
                 </SelectItem>
               </SelectContent>
