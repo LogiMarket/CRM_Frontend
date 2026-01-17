@@ -1,517 +1,369 @@
 "use client"
 
-import { useEffect, useState } from "react"
-import { ScrollArea } from "@/components/ui/scroll-area"
-import { Badge } from "@/components/ui/badge"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { Textarea } from "@/components/ui/textarea"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select"
-import { Info, MessageSquare, CheckCircle, Trash2, Edit2 } from "lucide-react"
-import { format } from "date-fns"
-import { es } from "date-fns/locale"
+  Info,
+  FileText,
+  User,
+  FolderOpen,
+  Zap,
+  Calendar,
+  Plus,
+  Video,
+  Link,
+  ExternalLink,
+  Copy,
+  Check,
+} from "lucide-react"
 
-interface Comment {
-  id: string
-  text: string
-  created_at: string
+interface Meeting {
+  id: number
+  title: string
+  date: string
+  time: string
+  type: "video" | "phone"
 }
 
-interface ConversationDetailsProps {
-  conversationId?: string | number
+interface DetailsPanelProps {
+  contactName?: string
+  contactPhone?: string
   status?: string
   priority?: string
-  agent_name?: string
-  created_at?: string
-  last_message_at?: string
-  contact_name?: string
-  phone_number?: string
+  agentName?: string
+  lastActivity?: string
+  onStatusChange?: (status: string) => void
+  onPriorityChange?: (priority: string) => void
+  conversationId?: string | number
   onUpdate?: () => void
-  onAgentChange?: (agentId: string, agentName: string) => void
 }
 
 export function ConversationDetails({
+  contactName,
+  contactPhone = "whatsapp:+5215548780484",
+  status = "active",
+  priority = "low",
+  agentName = "Juan Perez",
+  lastActivity = "16 ene",
+  onStatusChange,
+  onPriorityChange,
   conversationId,
-  status = "open",
-  priority = "medium",
-  agent_name,
-  created_at,
-  last_message_at,
-  contact_name,
-  phone_number,
   onUpdate,
-  onAgentChange,
-}: ConversationDetailsProps) {
-  const [comments, setComments] = useState<Comment[]>([])
-  const [newComment, setNewComment] = useState("")
+}: DetailsPanelProps) {
   const [currentStatus, setCurrentStatus] = useState(status)
   const [currentPriority, setCurrentPriority] = useState(priority)
-  const [currentAgentName, setCurrentAgentName] = useState(agent_name)
-  const [loading, setLoading] = useState(false)
-  const [commentsLoading, setCommentsLoading] = useState(false)
-  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
-  const [editingText, setEditingText] = useState("")
+  const [meetings, setMeetings] = useState<Meeting[]>([
+    { id: 1, title: "Seguimiento pedido", date: "18 ene", time: "10:00", type: "video" },
+  ])
+  const [scheduledSession, setScheduledSession] = useState<{
+    title: string
+    date: string
+    time: string
+    link: string
+  } | null>(null)
+  const [copied, setCopied] = useState(false)
 
-  useEffect(() => {
-    setCurrentStatus(status)
-  }, [status])
+  const calendarBookingLink = "https://calendly.com/logimarket/sesion-cliente"
 
-  useEffect(() => {
-    setCurrentPriority(priority)
-  }, [priority])
+  const handleCopyLink = () => {
+    navigator.clipboard.writeText(calendarBookingLink)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
+  }
 
-  useEffect(() => {
-    setCurrentAgentName(agent_name)
-  }, [agent_name])
+  const handleStatusChange = async (value: string) => {
+    setCurrentStatus(value)
+    onStatusChange?.(value)
 
-  useEffect(() => {
-    if (!conversationId) return
-
-    const loadComments = async () => {
-      setCommentsLoading(true)
+    // Actualizar en el backend si hay conversationId
+    if (conversationId) {
       try {
-        const response = await fetch(`/api/conversations/${conversationId}`)
+        const response = await fetch(`/api/conversations/${conversationId}/status`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ status: value }),
+        })
+
         if (response.ok) {
-          const data = await response.json()
-          console.log("[ConversationDetails] Comments data:", data.comments, typeof data.comments)
-          if (data.comments) {
-            try {
-              const parsed = JSON.parse(data.comments)
-              console.log("[ConversationDetails] Parsed comments:", parsed)
-              setComments(Array.isArray(parsed) ? parsed : [])
-            } catch (e) {
-              // Old format - plain text, try to convert manually
-              console.log("[ConversationDetails] Could not parse as JSON, data is:", data.comments)
-              if (typeof data.comments === "string" && data.comments.trim()) {
-                const textComments = data.comments.split("\n").filter((line: string) => line.trim())
-                const jsonArray = textComments.map((text: string, index: number) => ({
-                  id: `${Date.now()}-${index}`,
-                  text: text.trim(),
-                  created_at: new Date().toISOString(),
-                }))
-                console.log("[ConversationDetails] Converted to JSON:", jsonArray)
-                setComments(jsonArray)
-              } else {
-                setComments([])
-              }
-            }
-          } else {
-            setComments([])
-          }
+          onUpdate?.()
+        } else {
+          setCurrentStatus(status) // Revertir si falla
         }
       } catch (error) {
-        console.error("[ConversationDetails] Error loading comments:", error)
-      } finally {
-        setCommentsLoading(false)
+        console.error("Error updating status:", error)
+        setCurrentStatus(status) // Revertir si falla
       }
     }
-
-    loadComments()
-  }, [conversationId])
-  
-  const getStatusColor = (stat: string) => {
-    switch (stat) {
-      case 'open':
-        return 'bg-blue-50 dark:bg-blue-950/40 border-blue-300 dark:border-blue-700'
-      case 'assigned':
-        return 'bg-yellow-50 dark:bg-yellow-950/40 border-yellow-300 dark:border-yellow-700'
-      case 'resolved':
-        return 'bg-green-50 dark:bg-green-950/40 border-green-300 dark:border-green-700'
-      case 'closed':
-        return 'bg-gray-50 dark:bg-gray-950/40 border-gray-300 dark:border-gray-700'
-      default:
-        return 'bg-card border-border'
-    }
   }
 
-  const getStatusBadgeColor = (stat: string) => {
-    switch (stat) {
-      case 'open':
-        return 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-100 border-blue-300'
-      case 'assigned':
-        return 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-100 border-yellow-300'
-      case 'resolved':
-        return 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-100 border-green-300'
-      case 'closed':
-        return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-100 border-gray-300'
-      default:
-        return 'bg-gray-100 text-gray-800'
-    }
-  }
+  const handlePriorityChange = async (value: string) => {
+    setCurrentPriority(value)
+    onPriorityChange?.(value)
 
-  const getStatusIcon = (stat: string) => {
-    switch (stat) {
-      case 'open': return '🔵'
-      case 'assigned': return '🟡'
-      case 'resolved': return '🟢'
-      case 'closed': return '⚫'
-      default: return '•'
-    }
-  }
+    // Actualizar en el backend si hay conversationId
+    if (conversationId) {
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}/priority`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ priority: value }),
+        })
 
-  const getStatusLabel = (stat: string) => {
-    const labels: Record<string, string> = {
-      'open': 'Abierta',
-      'assigned': 'Asignada',
-      'resolved': 'Resuelta',
-      'closed': 'Cerrada'
-    }
-    return labels[stat] || stat
-  }
-
-  const handleStatusChange = async (newStatus: string) => {
-    if (!conversationId) return
-    
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/conversations/${conversationId}/status`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ status: newStatus }),
-      })
-
-      if (response.ok) {
-        setCurrentStatus(newStatus)
-        onUpdate?.()
+        if (response.ok) {
+          onUpdate?.()
+        } else {
+          setCurrentPriority(priority) // Revertir si falla
+        }
+      } catch (error) {
+        console.error("Error updating priority:", error)
+        setCurrentPriority(priority) // Revertir si falla
       }
-    } catch (error) {
-      console.error("[ConversationDetails] Error updating status:", error)
-    } finally {
-      setLoading(false)
     }
   }
 
-  const handlePriorityChange = async (newPriority: string) => {
-    if (!conversationId) return
-    
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/conversations/${conversationId}/priority`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ priority: newPriority }),
-      })
-
-      if (response.ok) {
-        setCurrentPriority(newPriority)
-        onUpdate?.()
-      }
-    } catch (error) {
-      console.error("[ConversationDetails] Error updating priority:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleAddComment = async () => {
-    if (!newComment.trim() || !conversationId) return
-
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/conversations/${conversationId}/comments`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ comment: newComment }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setComments(data.comments)
-        setNewComment("")
-        onUpdate?.()
-      }
-    } catch (error) {
-      console.error("[ConversationDetails] Error adding comment:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleDeleteComment = async (commentId: string) => {
-    if (!conversationId) return
-
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/conversations/${conversationId}/comments`, {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commentId }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setComments(data.comments)
-        onUpdate?.()
-      }
-    } catch (error) {
-      console.error("[ConversationDetails] Error deleting comment:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleEditComment = async (commentId: string) => {
-    if (!editingText.trim() || !conversationId) return
-
-    setLoading(true)
-    try {
-      const response = await fetch(`/api/conversations/${conversationId}/comments`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ commentId, text: editingText }),
-      })
-
-      if (response.ok) {
-        const data = await response.json()
-        setComments(data.comments)
-        setEditingCommentId(null)
-        setEditingText("")
-        onUpdate?.()
-      }
-    } catch (error) {
-      console.error("[ConversationDetails] Error editing comment:", error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleAgentUpdate = (agentId: string, agentName: string) => {
-    setCurrentAgentName(agentName)
-    onAgentChange?.(agentId, agentName)
+  const cleanPhoneNumber = (phone: string) => {
+    return phone.replace("whatsapp:", "").replace("+", "")
   }
 
   return (
-    <div className="flex h-full flex-col bg-background border-l border-border">
+    <div className="flex flex-col h-full bg-card">
       {/* Header */}
-      <div className="border-b border-border bg-card p-2">
-        <div className="flex items-center gap-2">
-          <Info className="h-3.5 w-3.5 text-primary flex-shrink-0" />
-          <h2 className="font-semibold text-xs text-foreground truncate">Detalles</h2>
+      <div className="flex items-center gap-2 p-2 border-b border-border">
+        <div className="flex items-center justify-center w-4 h-4 rounded-full bg-red-100">
+          <Info className="h-2.5 w-2.5 text-red-500" />
         </div>
+        <span className="font-semibold text-xs text-foreground">Detalles</span>
       </div>
 
-      {/* Content */}
-      <ScrollArea className="flex-1 overflow-y-auto">
-        <div className="space-y-1 p-2 pb-8">
-          {/* Contact Info */}
-          <Card className="border-l-4 border-l-blue-500 bg-gradient-to-br from-blue-50 to-blue-50/50 dark:from-blue-950/30 dark:to-blue-950/10">
-            <CardHeader className="pb-1 pt-1.5 px-2">
-              <CardTitle className="text-xs flex items-center gap-1 truncate">
-                <span>📱</span> <span className="truncate text-xs font-semibold">{contact_name || "Contacto"}</span>
-              </CardTitle>
-              <CardDescription className="text-xs text-blue-700 dark:text-blue-300 truncate">
-                {phone_number || "Sin número"}
-              </CardDescription>
-            </CardHeader>
-          </Card>
-
-          {/* Status Section */}
-          <Card className={`border-l-4 ${getStatusColor(currentStatus)} shadow-sm`}>
-            <CardHeader className="pb-1 pt-1.5 px-2">
-              <div className="flex items-center justify-between gap-1">
-                <CardTitle className="text-xs font-bold flex items-center gap-1 truncate">
-                  <span>{getStatusIcon(currentStatus)}</span>
-                  Estado
-                </CardTitle>
-                <Badge className={`${getStatusBadgeColor(currentStatus)} border text-xs h-5`}>
-                  {getStatusLabel(currentStatus)}
-                </Badge>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-1 px-2 pb-1.5">
-              <Select value={currentStatus} onValueChange={handleStatusChange} disabled={loading}>
-                <SelectTrigger className="h-7 text-xs shadow-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">
-                    <span className="flex items-center gap-2">🔵 Activa</span>
-                  </SelectItem>
-                  <SelectItem value="resolved">
-                    <span className="flex items-center gap-2">🟢 Resuelta</span>
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {/* Priority */}
-          <Card className="border-l-4 border-l-orange-500 shadow-sm">
-            <CardHeader className="pb-1 pt-1.5 px-2">
-              <CardTitle className="text-xs font-bold flex items-center gap-1">
-                <span>⚡</span> Prioridad
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1 px-2 pb-1.5">
-              <Select value={currentPriority} onValueChange={handlePriorityChange} disabled={loading}>
-                <SelectTrigger className="h-7 text-xs shadow-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="low">🔵 Baja</SelectItem>
-                  <SelectItem value="medium">🟡 Media</SelectItem>
-                  <SelectItem value="high">🔴 Alta</SelectItem>
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {/* Agent Info */}
-          {currentAgentName && (
-            <Card className="border-l-4 border-l-purple-500 bg-gradient-to-br from-purple-50 to-purple-50/50 dark:from-purple-950/30 dark:to-purple-950/10">
-              <CardHeader className="pb-1 pt-1.5 px-2">
-                <CardTitle className="text-xs font-bold flex items-center gap-1">
-                  <span>👤</span> Agente
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="px-2 pb-1.5">
-                <div className="text-xs font-semibold text-purple-700 dark:text-purple-300 truncate">
-                  {currentAgentName}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Timeline */}
-          <Card className="border-l-4 border-l-gray-400 shadow-sm">
-            <CardHeader className="pb-1 pt-1.5 px-2">
-              <CardTitle className="text-xs font-bold flex items-center gap-1">
-                <span>📅</span> Timeline
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-0.5 text-xs px-2 pb-1.5">
-              {created_at && (
-                <div className="flex justify-between gap-1">
-                  <span className="text-muted-foreground truncate text-xs">Creada:</span>
-                  <span className="font-medium text-right text-xs">
-                    {format(new Date(created_at), "dd MMM", { locale: es })}
-                  </span>
-                </div>
-              )}
-              {last_message_at && (
-                <div className="flex justify-between gap-1">
-                  <span className="text-muted-foreground truncate text-xs">Último:</span>
-                  <span className="font-medium text-right text-xs">
-                    {format(new Date(last_message_at), "dd MMM", { locale: es })}
-                  </span>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Comments */}
-          <Card className="border-l-4 border-l-indigo-500 shadow-sm">
-            <CardHeader className="pb-1.5 pt-1.5 px-2">
-              <CardTitle className="text-xs font-bold flex items-center gap-1">
-                <span>💬</span> Comentarios
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-1.5 px-2 pb-1.5">
-              {comments && comments.length > 0 ? (
-                <div className="space-y-1 max-h-32 overflow-y-auto rounded-md border border-border p-1.5 bg-muted/50">
-                  {comments.map((comment) => (
-                    <div
-                      key={comment.id}
-                      className="bg-background p-1.5 rounded border border-border text-xs space-y-0.5"
-                    >
-                      {editingCommentId === comment.id ? (
-                        <>
-                          <Textarea
-                            value={editingText}
-                            onChange={(e) => setEditingText(e.target.value)}
-                            className="resize-none h-12 text-xs"
-                            disabled={loading}
-                          />
-                          <div className="flex gap-1 justify-end">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => {
-                                setEditingCommentId(null)
-                                setEditingText("")
-                              }}
-                              disabled={loading}
-                              className="h-6 text-xs"
-                            >
-                              Cancelar
-                            </Button>
-                            <Button
-                              size="sm"
-                              onClick={() => handleEditComment(comment.id)}
-                              disabled={!editingText.trim() || loading}
-                              className="h-6 text-xs"
-                            >
-                              Guardar
-                            </Button>
-                          </div>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-foreground break-words text-xs">{comment.text}</p>
-                          <div className="flex items-center justify-between gap-2 pt-0.5">
-                            <span className="text-muted-foreground text-xs">
-                              {format(new Date(comment.created_at), "dd MMM HH:mm", { locale: es })}
-                            </span>
-                            <div className="flex gap-0.5">
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => {
-                                  setEditingCommentId(comment.id)
-                                  setEditingText(comment.text)
-                                }}
-                                disabled={loading}
-                                className="h-5 w-5 p-0"
-                              >
-                                <Edit2 className="h-2.5 w-2.5" />
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => handleDeleteComment(comment.id)}
-                                disabled={loading}
-                                className="h-5 w-5 p-0 text-destructive hover:text-destructive"
-                              >
-                                <Trash2 className="h-2.5 w-2.5" />
-                              </Button>
-                            </div>
-                          </div>
-                        </>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-muted-foreground py-1">No hay comentarios</p>
-              )}
-              
-              <Textarea
-                placeholder="Comentario..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                className="resize-none h-16 text-xs"
-                disabled={loading || commentsLoading || editingCommentId !== null}
-              />
-
-              <Button
-                onClick={handleAddComment}
-                disabled={!newComment.trim() || loading || commentsLoading || editingCommentId !== null}
-                size="sm"
-                className="w-full gap-1 text-xs h-7"
-              >
-                <CheckCircle className="h-2.5 w-2.5" />
-                {loading || commentsLoading ? "Guardando..." : "Guardar"}
-              </Button>
-            </CardContent>
-          </Card>
+      <div className="flex-1 overflow-y-auto">
+        {/* Contact Phone */}
+        <div className="flex border-b border-border">
+          <div className="w-1 bg-orange-400 shrink-0" />
+          <div className="flex-1 p-2">
+            <div className="flex items-center gap-1.5">
+              <FileText className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs text-foreground truncate">{contactPhone}</span>
+            </div>
+            <a
+              href={`https://wa.me/${cleanPhoneNumber(contactPhone)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-xs text-primary hover:underline ml-4.5 block truncate"
+            >
+              {contactPhone}
+            </a>
+          </div>
         </div>
-      </ScrollArea>
+
+        {/* Status */}
+        <div className="flex border-b border-border">
+          <div className="w-1 bg-purple-400 shrink-0" />
+          <div className="flex-1 p-2">
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <div className="h-1.5 w-1.5 rounded-full bg-purple-400" />
+                <span className="text-xs text-foreground">Estado</span>
+              </div>
+              <span className="text-xs text-muted-foreground capitalize">{currentStatus}</span>
+            </div>
+            <Select value={currentStatus} onValueChange={handleStatusChange}>
+              <SelectTrigger className="h-7 text-xs bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="active">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-blue-500" />
+                    Activa
+                  </div>
+                </SelectItem>
+                <SelectItem value="pending">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+                    Pendiente
+                  </div>
+                </SelectItem>
+                <SelectItem value="resolved">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+                    Resuelta
+                  </div>
+                </SelectItem>
+                <SelectItem value="closed">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-gray-500" />
+                    Cerrada
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Priority */}
+        <div className="flex border-b border-border">
+          <div className="w-1 bg-orange-400 shrink-0" />
+          <div className="flex-1 p-2">
+            <div className="flex items-center gap-1.5 mb-1">
+              <Zap className="h-3 w-3 text-orange-500" />
+              <span className="text-xs text-foreground">Prioridad</span>
+            </div>
+            <Select value={currentPriority} onValueChange={handlePriorityChange}>
+              <SelectTrigger className="h-7 text-xs bg-background">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="high">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-red-500" />
+                    Alta
+                  </div>
+                </SelectItem>
+                <SelectItem value="medium">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-yellow-500" />
+                    Media
+                  </div>
+                </SelectItem>
+                <SelectItem value="low">
+                  <div className="flex items-center gap-1.5">
+                    <div className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+                    Baja
+                  </div>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        {/* Agent */}
+        <div className="flex border-b border-border">
+          <div className="w-1 bg-blue-400 shrink-0" />
+          <div className="flex-1 p-2">
+            <div className="flex items-center gap-1.5">
+              <User className="h-3 w-3 text-muted-foreground" />
+              <span className="text-xs text-foreground">Agente</span>
+            </div>
+            <span className="text-xs font-medium text-primary ml-4.5">{agentName}</span>
+          </div>
+        </div>
+
+        {/* Timeline */}
+        <div className="flex border-b border-border">
+          <div className="w-1 bg-blue-400 shrink-0" />
+          <div className="flex-1 p-2">
+            <div className="flex items-center gap-1.5">
+              <FolderOpen className="h-3 w-3 text-blue-500" />
+              <span className="text-xs text-foreground">Timeline</span>
+            </div>
+            <div className="flex items-center justify-between ml-4.5">
+              <span className="text-xs text-muted-foreground">Último:</span>
+              <span className="text-xs text-foreground">{lastActivity}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Meetings */}
+        <div className="flex">
+          <div className="w-1 bg-green-400 shrink-0" />
+          <div className="flex-1 p-2">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <Calendar className="h-3 w-3 text-green-500" />
+                <span className="text-xs text-foreground">Reuniones</span>
+              </div>
+              <Button variant="ghost" size="sm" className="h-5 w-5 p-0 hover:bg-muted">
+                <Plus className="h-3 w-3 text-muted-foreground" />
+              </Button>
+            </div>
+
+            {/* Meetings List */}
+            {meetings.length > 0 ? (
+              <div className="space-y-1.5">
+                {meetings.map((meeting) => (
+                  <div key={meeting.id} className="bg-green-50 border border-green-200 rounded p-1.5">
+                    <div className="flex items-center gap-1.5">
+                      <Video className="h-3 w-3 text-green-600" />
+                      <span className="text-xs font-medium text-green-800 truncate">{meeting.title}</span>
+                    </div>
+                    <div className="flex items-center justify-between mt-0.5 ml-4.5">
+                      <span className="text-xs text-green-600">{meeting.date}</span>
+                      <span className="text-xs text-green-600">{meeting.time}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-xs text-muted-foreground text-center py-2">Sin reuniones agendadas</div>
+            )}
+          </div>
+        </div>
+
+        {/* Booking Section */}
+        <div className="flex">
+          <div className="w-1 bg-cyan-400 shrink-0" />
+          <div className="flex-1 p-2">
+            <div className="flex items-center gap-1.5 mb-2">
+              <Link className="h-3 w-3 text-cyan-500" />
+              <span className="text-xs text-foreground">Agenda</span>
+            </div>
+
+            {/* Booking Link */}
+            <div className="bg-cyan-50 border border-cyan-200 rounded p-2 mb-2">
+              <p className="text-xs text-cyan-800 mb-1.5">Link para agendar sesión:</p>
+              <div className="flex items-center gap-1">
+                <input
+                  type="text"
+                  value={calendarBookingLink}
+                  readOnly
+                  className="flex-1 text-xs bg-white border border-cyan-200 rounded px-2 py-1 text-cyan-700 truncate"
+                />
+                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-cyan-100" onClick={handleCopyLink}>
+                  {copied ? <Check className="h-3 w-3 text-green-500" /> : <Copy className="h-3 w-3 text-cyan-600" />}
+                </Button>
+                <a
+                  href={calendarBookingLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="h-6 w-6 p-0 flex items-center justify-center hover:bg-cyan-100 rounded"
+                >
+                  <ExternalLink className="h-3 w-3 text-cyan-600" />
+                </a>
+              </div>
+            </div>
+
+            {/* Scheduled Session */}
+            {scheduledSession ? (
+              <div className="bg-green-50 border border-green-200 rounded p-2">
+                <div className="flex items-center gap-1.5 mb-1">
+                  <Video className="h-3 w-3 text-green-600" />
+                  <span className="text-xs font-medium text-green-800">Sesión agendada</span>
+                </div>
+                <p className="text-xs text-green-700 font-medium">{scheduledSession.title}</p>
+                <div className="flex items-center justify-between mt-1">
+                  <span className="text-xs text-green-600">{scheduledSession.date}</span>
+                  <span className="text-xs text-green-600">{scheduledSession.time}</span>
+                </div>
+                <a
+                  href={scheduledSession.link}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-primary hover:underline flex items-center gap-1 mt-1"
+                >
+                  <Video className="h-2.5 w-2.5" />
+                  Unirse a la sesión
+                </a>
+              </div>
+            ) : (
+              <div className="text-center py-2 border border-dashed border-muted rounded">
+                <p className="text-xs text-muted-foreground mb-1">Sin sesión agendada</p>
+                <p className="text-xs text-muted-foreground">Comparte el link con el cliente</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
