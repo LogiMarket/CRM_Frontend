@@ -1,8 +1,9 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Textarea } from "@/components/ui/textarea"
 import {
   Info,
   FileText,
@@ -16,6 +17,9 @@ import {
   ExternalLink,
   Copy,
   Check,
+  MessageSquare,
+  Trash2,
+  Edit2,
 } from "lucide-react"
 
 interface Meeting {
@@ -24,6 +28,12 @@ interface Meeting {
   date: string
   time: string
   type: "video" | "phone"
+}
+
+interface Comment {
+  id: string
+  text: string
+  created_at: string
 }
 
 interface DetailsPanelProps {
@@ -63,8 +73,55 @@ export function ConversationDetails({
     link: string
   } | null>(null)
   const [copied, setCopied] = useState(false)
+  const [comments, setComments] = useState<Comment[]>([])
+  const [newComment, setNewComment] = useState("")
+  const [editingCommentId, setEditingCommentId] = useState<string | null>(null)
+  const [editingText, setEditingText] = useState("")
+  const [loading, setLoading] = useState(false)
+  const [commentsLoading, setCommentsLoading] = useState(false)
 
   const calendarBookingLink = "https://calendly.com/logimarket/sesion-cliente"
+
+  // Cargar comentarios
+  useEffect(() => {
+    if (!conversationId) return
+
+    const loadComments = async () => {
+      setCommentsLoading(true)
+      try {
+        const response = await fetch(`/api/conversations/${conversationId}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.comments) {
+            try {
+              const parsed = JSON.parse(data.comments)
+              setComments(Array.isArray(parsed) ? parsed : [])
+            } catch (e) {
+              if (typeof data.comments === "string" && data.comments.trim()) {
+                const textComments = data.comments.split("\n").filter((line: string) => line.trim())
+                const jsonArray = textComments.map((text: string, index: number) => ({
+                  id: `${Date.now()}-${index}`,
+                  text: text.trim(),
+                  created_at: new Date().toISOString(),
+                }))
+                setComments(jsonArray)
+              } else {
+                setComments([])
+              }
+            }
+          } else {
+            setComments([])
+          }
+        }
+      } catch (error) {
+        console.error("Error loading comments:", error)
+      } finally {
+        setCommentsLoading(false)
+      }
+    }
+
+    loadComments()
+  }, [conversationId])
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(calendarBookingLink)
@@ -76,7 +133,6 @@ export function ConversationDetails({
     setCurrentStatus(value)
     onStatusChange?.(value)
 
-    // Actualizar en el backend si hay conversationId
     if (conversationId) {
       try {
         const response = await fetch(`/api/conversations/${conversationId}/status`, {
@@ -88,11 +144,11 @@ export function ConversationDetails({
         if (response.ok) {
           onUpdate?.()
         } else {
-          setCurrentStatus(status) // Revertir si falla
+          setCurrentStatus(status)
         }
       } catch (error) {
         console.error("Error updating status:", error)
-        setCurrentStatus(status) // Revertir si falla
+        setCurrentStatus(status)
       }
     }
   }
@@ -101,7 +157,6 @@ export function ConversationDetails({
     setCurrentPriority(value)
     onPriorityChange?.(value)
 
-    // Actualizar en el backend si hay conversationId
     if (conversationId) {
       try {
         const response = await fetch(`/api/conversations/${conversationId}/priority`, {
@@ -113,12 +168,84 @@ export function ConversationDetails({
         if (response.ok) {
           onUpdate?.()
         } else {
-          setCurrentPriority(priority) // Revertir si falla
+          setCurrentPriority(priority)
         }
       } catch (error) {
         console.error("Error updating priority:", error)
-        setCurrentPriority(priority) // Revertir si falla
+        setCurrentPriority(priority)
       }
+    }
+  }
+
+  const handleAddComment = async () => {
+    if (!newComment.trim() || !conversationId) return
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ comment: newComment }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setComments(data.comments)
+        setNewComment("")
+        onUpdate?.()
+      }
+    } catch (error) {
+      console.error("Error adding comment:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!conversationId) return
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/comments`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commentId }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setComments(data.comments)
+        onUpdate?.()
+      }
+    } catch (error) {
+      console.error("Error deleting comment:", error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleEditComment = async (commentId: string) => {
+    if (!editingText.trim() || !conversationId) return
+
+    setLoading(true)
+    try {
+      const response = await fetch(`/api/conversations/${conversationId}/comments`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commentId, text: editingText }),
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setComments(data.comments)
+        setEditingCommentId(null)
+        setEditingText("")
+        onUpdate?.()
+      }
+    } catch (error) {
+      console.error("Error editing comment:", error)
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -361,6 +488,112 @@ export function ConversationDetails({
                 <p className="text-xs text-muted-foreground">Comparte el link con el cliente</p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Comments */}
+        <div className="flex">
+          <div className="w-1 bg-indigo-400 shrink-0" />
+          <div className="flex-1 p-2">
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center gap-1.5">
+                <MessageSquare className="h-3 w-3 text-indigo-500" />
+                <span className="text-xs text-foreground">Comentarios</span>
+              </div>
+            </div>
+
+            {/* Comments List */}
+            {comments && comments.length > 0 ? (
+              <div className="space-y-1 max-h-40 overflow-y-auto rounded-md border border-border p-1.5 bg-muted/50 mb-2">
+                {comments.map((comment) => (
+                  <div key={comment.id} className="bg-background p-1.5 rounded border border-border text-xs space-y-0.5">
+                    {editingCommentId === comment.id ? (
+                      <>
+                        <Textarea
+                          value={editingText}
+                          onChange={(e) => setEditingText(e.target.value)}
+                          className="resize-none h-12 text-xs"
+                          disabled={loading}
+                        />
+                        <div className="flex gap-1 justify-end">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setEditingCommentId(null)
+                              setEditingText("")
+                            }}
+                            disabled={loading}
+                            className="h-6 text-xs"
+                          >
+                            Cancelar
+                          </Button>
+                          <Button
+                            size="sm"
+                            onClick={() => handleEditComment(comment.id)}
+                            disabled={!editingText.trim() || loading}
+                            className="h-6 text-xs"
+                          >
+                            Guardar
+                          </Button>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-foreground break-words text-xs">{comment.text}</p>
+                        <div className="flex items-center justify-between gap-2 pt-0.5">
+                          <span className="text-muted-foreground text-xs">
+                            {new Date(comment.created_at).toLocaleDateString()}
+                          </span>
+                          <div className="flex gap-0.5">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => {
+                                setEditingCommentId(comment.id)
+                                setEditingText(comment.text)
+                              }}
+                              disabled={loading}
+                              className="h-5 w-5 p-0 hover:bg-muted"
+                            >
+                              <Edit2 className="h-2.5 w-2.5" />
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleDeleteComment(comment.id)}
+                              disabled={loading}
+                              className="h-5 w-5 p-0 text-destructive hover:text-destructive hover:bg-red-50"
+                            >
+                              <Trash2 className="h-2.5 w-2.5" />
+                            </Button>
+                          </div>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground py-1 mb-2">No hay comentarios</p>
+            )}
+
+            <Textarea
+              placeholder="Agregar comentario..."
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              className="resize-none h-16 text-xs mb-1.5"
+              disabled={loading || commentsLoading || editingCommentId !== null}
+            />
+
+            <Button
+              onClick={handleAddComment}
+              disabled={!newComment.trim() || loading || commentsLoading || editingCommentId !== null}
+              size="sm"
+              className="w-full gap-1 text-xs h-7"
+            >
+              {loading || commentsLoading ? "Guardando..." : "Guardar comentario"}
+            </Button>
           </div>
         </div>
       </div>
