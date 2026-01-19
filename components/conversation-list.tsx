@@ -21,6 +21,7 @@ interface Conversation {
   status: string
   priority: string
   agent_name?: string
+  channel?: string // whatsapp, facebook, etc
 }
 
 interface ConversationListProps {
@@ -44,6 +45,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
     status: conv.status,
     priority: conv.priority,
     agent_name: undefined, // TODO: fetch from assigned_agent_id
+    channel: conv.channel || 'whatsapp',
   }))
 
   const getInitials = (name: string) => {
@@ -78,6 +80,32 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
       "low": "Baja",
     }
     return labels[priority] || priority
+  }
+
+  const getChannelIcon = (channel?: string) => {
+    switch (channel) {
+      case 'facebook':
+        return '💬' // Facebook Messenger
+      case 'whatsapp':
+        return '💚' // WhatsApp
+      case 'instagram':
+        return '📷' // Instagram
+      default:
+        return '💬' // Default
+    }
+  }
+
+  const getChannelColor = (channel?: string) => {
+    switch (channel) {
+      case 'facebook':
+        return 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
+      case 'whatsapp':
+        return 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300'
+      case 'instagram':
+        return 'bg-pink-100 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300'
+      default:
+        return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+    }
   }
 
   if (loading) {
@@ -122,11 +150,20 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
             )}
           >
             <div className="flex items-start gap-3">
-              <Avatar className="h-11 w-11 flex-shrink-0 ring-2 ring-background shadow-sm">
-                <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm">
-                  {getInitials(conv.contact_name)}
-                </AvatarFallback>
-              </Avatar>
+              <div className="relative flex-shrink-0">
+                <Avatar className="h-11 w-11 ring-2 ring-background shadow-sm">
+                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm">
+                    {getInitials(conv.contact_name)}
+                  </AvatarFallback>
+                </Avatar>
+                {/* Channel badge */}
+                <div className={cn(
+                  "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center text-xs shadow-md ring-2 ring-background",
+                  getChannelColor(conv.channel)
+                )}>
+                  {getChannelIcon(conv.channel)}
+                </div>
+              </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center justify-between gap-2 mb-1">
                   <h3 className="truncate font-bold text-sm text-foreground">{conv.contact_name}</h3>

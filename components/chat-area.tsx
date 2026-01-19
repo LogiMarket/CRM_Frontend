@@ -34,10 +34,12 @@ interface ChatAreaProps {
   conversationId?: number | string
   contactName?: string
   currentAgentId?: number | string
+  channel?: string // 'whatsapp', 'facebook', etc
+  externalUserId?: string // PSID for Facebook, phone for WhatsApp
   onUpdate?: () => void
 }
 
-export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate }: ChatAreaProps) {
+export function ChatArea({ conversationId, contactName, currentAgentId, channel = 'whatsapp', externalUserId, onUpdate }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(false)
@@ -100,36 +102,67 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
     setNewMessage("") // Clear input immediately for better UX
     
     try {
-      const response = await fetch(`/api/conversations/${conversationId}/messages`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: messageContent }),
-      })
+      // Detectar canal y usar endpoint apropiado
+      if (channel === 'facebook' && externalUserId) {
+        // Enviar via Facebook Messenger
+        const response = await fetch(`/api/facebook/send`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ 
+            recipientId: externalUserId,
+            message: messageContent,
+            conversationId: conversationId
+          }),
+        })
 
-      if (!response.ok) {
-        console.error("[ChatArea] Send message error:", response.status, response.statusText)
-        // Restore message if sending failed
-        setNewMessage(messageContent)
-        return
-      }
+        if (!response.ok) {
+          console.error("[ChatArea] Facebook send error:", response.status, response.statusText)
+          setNewMessage(messageContent)
+          return
+        }
 
-      const data = await response.json()
-      if (data.message) {
-        // Agregar nuevo mensaje al final (ya que están en orden ascendente)
+        const data = await response.json()
+        // Agregar mensaje al UI
         setMessages([
           ...messages,
           {
-            id: data.message.id,
-            content: data.message.content,
-            sender_type: data.message.sender_type || "agent",
-            sender_name: data.message.sender_name || "Agent",
-            created_at: data.message.created_at || new Date().toISOString(),
+            id: data.messageId || Date.now(),
+            content: messageContent,
+            sender_type: "agent",
+            sender_name: "Agent",
+            created_at: new Date().toISOString(),
           },
         ])
+      } else {
+        // Enviar via endpoint normal (WhatsApp u otros)
+        const response = await fetch(`/api/conversations/${conversationId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ content: messageContent }),
+        })
+
+        if (!response.ok) {
+          console.error("[ChatArea] Send message error:", response.status, response.statusText)
+          setNewMessage(messageContent)
+          return
+        }
+
+        const data = await response.json()
+        if (data.message) {
+          setMessages([
+            ...messages,
+            {
+              id: data.message.id,
+              content: data.message.content,
+              sender_type: data.message.sender_type || "agent",
+              sender_name: data.message.sender_name || "Agent",
+              created_at: data.message.created_at || new Date().toISOString(),
+            },
+          ])
+        }
       }
     } catch (error) {
       console.error("[ChatArea] Send message error:", error)
-      // Restore message if sending failed
       setNewMessage(messageContent)
     } finally {
       setSending(false)
@@ -214,7 +247,21 @@ export function ChatArea({ conversationId, contactName, currentAgentId, onUpdate
             </AvatarFallback>
           </Avatar>
           <div>
-            <h2 className="font-semibold text-sm text-foreground">{contactName || "Contacto"}</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="font-semibold text-sm text-foreground">{contactName || "Contacto"}</h2>
+              {/* Channel badge */}
+              {channel && (
+                <span className={cn(
+                  "text-xs px-2 py-0.5 rounded-full font-medium",
+                  channel === 'facebook' && "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300",
+                  channel === 'whatsapp' && "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300"
+                )}>
+                  {channel === 'facebook' && '💬 Facebook'}
+                  {channel === 'whatsapp' && '💚 WhatsApp'}
+                  {channel !== 'facebook' && channel !== 'whatsapp' && channel}
+                </span>
+              )}
+            </div>
             <p className="text-muted-foreground text-xs flex items-center gap-1">
               <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse shadow-sm shadow-blue-500/50" />
               En línea

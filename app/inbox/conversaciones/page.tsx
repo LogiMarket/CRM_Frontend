@@ -12,6 +12,8 @@ export default function ConversacionesPage() {
   const [selectedContactName, setSelectedContactName] = useState<string>()
   const [selectedContactId, setSelectedContactId] = useState<number>()
   const [currentAgentId, setCurrentAgentId] = useState<number>()
+  const [selectedChannel, setSelectedChannel] = useState<string>('whatsapp')
+  const [selectedExternalUserId, setSelectedExternalUserId] = useState<string>()
   const [refreshKey, setRefreshKey] = useState(0)
   const { role } = useUserRole()
   
@@ -28,6 +30,8 @@ export default function ConversacionesPage() {
           setSelectedContactName(conv.contact_name)
           setSelectedContactId(conv.contact_id)
           setCurrentAgentId(conv.assigned_agent_id)
+          setSelectedChannel(conv.channel || 'whatsapp')
+          setSelectedExternalUserId(conv.external_user_id)
         }
       })
   }
@@ -54,6 +58,8 @@ export default function ConversacionesPage() {
             conversationId={selectedConversationId}
             contactName={selectedContactName}
             currentAgentId={currentAgentId}
+            channel={selectedChannel}
+            externalUserId={selectedExternalUserId}
             onUpdate={handleUpdate}
           />
         </div>
