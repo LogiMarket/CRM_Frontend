@@ -24,6 +24,8 @@ export interface Conversation {
   unread_count: number
   created_at: string
   updated_at: string
+  channel?: string // whatsapp, facebook, etc
+  external_user_id?: string // Facebook PSID or WhatsApp number
 }
 
 export function useConversations(onlyAssigned?: boolean) {
@@ -73,6 +75,8 @@ export function useConversations(onlyAssigned?: boolean) {
         status: (conv.status as "active" | "resolved") || "active",
         priority: (conv.priority as "low" | "medium" | "high") || "low",
         assigned_agent_id: conv.assigned_agent_id ? String(conv.assigned_agent_id) : undefined,
+        channel: conv.channel || "whatsapp",
+        external_user_id: conv.external_user_id,
         last_message: conv.last_message ? {
           id: "last",
           content: conv.last_message,

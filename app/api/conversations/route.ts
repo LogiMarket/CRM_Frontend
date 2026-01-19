@@ -54,6 +54,8 @@ export async function GET(request: Request) {
             c.last_message_at,
             c.assigned_agent_id,
             c.contact_id,
+            COALESCE(c.channel, 'whatsapp') as channel,
+            c.external_user_id,
             contacts.name as contact_name,
             contacts.phone_number,
             contacts.avatar_url as contact_avatar,
