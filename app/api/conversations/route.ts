@@ -46,28 +46,61 @@ export async function GET(request: Request) {
     if (userRole === "Administrador") {
       // Admin can see all conversations
       if (status === "all") {
-        conversations = await sql`
-          SELECT 
-            c.id,
-            c.status,
-            c.priority,
-            c.last_message_at,
-            c.assigned_agent_id,
-            c.contact_id,
-            COALESCE(c.channel, 'whatsapp') as channel,
-            c.external_user_id,
-            contacts.name as contact_name,
-            contacts.phone_number,
-            contacts.avatar_url as contact_avatar,
-            u.name as agent_name,
-            (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
-            (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
-          FROM conversations c
-          LEFT JOIN contacts ON c.contact_id = contacts.id
-          LEFT JOIN users u ON c.assigned_agent_id = u.id
-          ORDER BY c.last_message_at DESC
-          LIMIT 50
-        `
+        try {
+          conversations = await sql`
+            SELECT 
+              c.id,
+              c.status,
+              c.priority,
+              c.last_message_at,
+              c.assigned_agent_id,
+              c.contact_id,
+              COALESCE(c.channel, 'whatsapp') as channel,
+              c.external_user_id,
+              contacts.name as contact_name,
+              contacts.phone_number,
+              contacts.avatar_url as contact_avatar,
+              u.name as agent_name,
+              (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+              (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
+            FROM conversations c
+            LEFT JOIN contacts ON c.contact_id = contacts.id
+            LEFT JOIN users u ON c.assigned_agent_id = u.id
+            ORDER BY c.last_message_at DESC
+            LIMIT 50
+          `
+        } catch (error: any) {
+          const message = String(error?.message || "")
+          const code = String(error?.code || "")
+
+          // Compatibilidad con esquemas viejos (sin channel / external_user_id)
+          if (code === "42703" && (message.includes("c.channel") || message.includes("c.external_user_id"))) {
+            conversations = await sql`
+              SELECT 
+                c.id,
+                c.status,
+                c.priority,
+                c.last_message_at,
+                c.assigned_agent_id,
+                c.contact_id,
+                'whatsapp' as channel,
+                NULL::varchar as external_user_id,
+                contacts.name as contact_name,
+                contacts.phone_number,
+                contacts.avatar_url as contact_avatar,
+                u.name as agent_name,
+                (SELECT content FROM messages WHERE conversation_id = c.id ORDER BY created_at DESC LIMIT 1) as last_message,
+                (SELECT COUNT(*) FROM messages WHERE conversation_id = c.id AND read_at IS NULL AND sender_type = 'contact') as unread_count
+              FROM conversations c
+              LEFT JOIN contacts ON c.contact_id = contacts.id
+              LEFT JOIN users u ON c.assigned_agent_id = u.id
+              ORDER BY c.last_message_at DESC
+              LIMIT 50
+            `
+          } else {
+            throw error
+          }
+        }
       } else {
         conversations = await sql`
           SELECT 
