@@ -74,7 +74,13 @@ export async function GET(request: Request) {
           const code = String(error?.code || "")
 
           // Compatibilidad con esquemas viejos (sin channel / external_user_id)
-          if (code === "42703" && (message.includes("c.channel") || message.includes("c.external_user_id"))) {
+          const missingColumn =
+            message.includes("c.channel") ||
+            message.includes("c.external_user_id") ||
+            message.includes("column c.channel") ||
+            message.includes("column c.external_user_id")
+
+          if ((code === "42703" || !code) && missingColumn) {
             conversations = await sql`
               SELECT 
                 c.id,

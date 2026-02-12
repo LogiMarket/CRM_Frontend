@@ -36,7 +36,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       return NextResponse.json({ messages })
     }
 
-    // Query messages - try to get by UUID first, then try as integer
+    // Query messages - try to get by UUID first, then try as integer.
+    // Also support alternative schemas (e.g. CRM backend) where media fields may be stored in columns.
     let messages = []
     try {
       messages = await sql`
@@ -45,6 +46,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
           m.content,
           m.message_type,
           m.metadata,
+          m.media_id,
+          m.media_filename,
+          m.media_mime_type,
+          m.media_caption,
           m.sender_type,
           m.sender_id,
           m.created_at,
@@ -61,27 +66,103 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       `
     } catch (queryError) {
       console.error("[GET messages] Query with ::text failed, trying alternate:", queryError)
-      // Try alternate approach if UUID casting fails
-      messages = await sql`
-        SELECT 
-          m.id,
-          m.content,
-          m.message_type,
-          m.metadata,
-          m.sender_type,
-          m.sender_id,
-          m.created_at,
-          COALESCE(
-            CASE WHEN m.sender_type = 'contact' THEN c.name END,
-            CASE WHEN m.sender_type = 'agent' THEN u.name END,
-            'Unknown'
-          ) as sender_name
-        FROM messages m
-        LEFT JOIN contacts c ON m.sender_type IN ('contact','customer') AND m.sender_id = c.id
-        LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
-        WHERE CAST(m.conversation_id AS VARCHAR) = ${id}
-        ORDER BY m.created_at ASC
-      `
+
+      // If the failure was due to missing media columns, retry without them.
+      const queryMsg = String((queryError as any)?.message || "")
+      const missingMediaColumns =
+        queryMsg.includes("m.media_id") ||
+        queryMsg.includes("m.media_filename") ||
+        queryMsg.includes("m.media_mime_type") ||
+        queryMsg.includes("m.media_caption")
+
+      if (missingMediaColumns) {
+        try {
+          messages = await sql`
+            SELECT 
+              m.id,
+              m.content,
+              m.message_type,
+              m.metadata,
+              m.sender_type,
+              m.sender_id,
+              m.created_at,
+              COALESCE(
+                CASE WHEN m.sender_type = 'contact' THEN c.name END,
+                CASE WHEN m.sender_type = 'agent' THEN u.name END,
+                'Unknown'
+              ) as sender_name
+            FROM messages m
+            LEFT JOIN contacts c ON m.sender_type IN ('contact','customer') AND m.sender_id = c.id
+            LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
+            WHERE m.conversation_id::text = ${id}
+            ORDER BY m.created_at ASC
+          `
+        } catch {
+          // fall through to CAST retry
+        }
+      }
+
+      // Try alternate approach if UUID casting fails (or previous retry didn't produce results)
+      if (!messages?.length) {
+        try {
+          messages = await sql`
+            SELECT 
+              m.id,
+              m.content,
+              m.message_type,
+              m.metadata,
+              m.media_id,
+              m.media_filename,
+              m.media_mime_type,
+              m.media_caption,
+              m.sender_type,
+              m.sender_id,
+              m.created_at,
+              COALESCE(
+                CASE WHEN m.sender_type = 'contact' THEN c.name END,
+                CASE WHEN m.sender_type = 'agent' THEN u.name END,
+                'Unknown'
+              ) as sender_name
+            FROM messages m
+            LEFT JOIN contacts c ON m.sender_type IN ('contact','customer') AND m.sender_id = c.id
+            LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
+            WHERE CAST(m.conversation_id AS VARCHAR) = ${id}
+            ORDER BY m.created_at ASC
+          `
+        } catch (castError: any) {
+          const castMsg = String(castError?.message || "")
+          const castMissingMediaColumns =
+            castMsg.includes("m.media_id") ||
+            castMsg.includes("m.media_filename") ||
+            castMsg.includes("m.media_mime_type") ||
+            castMsg.includes("m.media_caption")
+
+          if (castMissingMediaColumns) {
+            messages = await sql`
+              SELECT 
+                m.id,
+                m.content,
+                m.message_type,
+                m.metadata,
+                m.sender_type,
+                m.sender_id,
+                m.created_at,
+                COALESCE(
+                  CASE WHEN m.sender_type = 'contact' THEN c.name END,
+                  CASE WHEN m.sender_type = 'agent' THEN u.name END,
+                  'Unknown'
+                ) as sender_name
+              FROM messages m
+              LEFT JOIN contacts c ON m.sender_type IN ('contact','customer') AND m.sender_id = c.id
+              LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
+              WHERE CAST(m.conversation_id AS VARCHAR) = ${id}
+              ORDER BY m.created_at ASC
+            `
+          } else {
+            throw castError
+          }
+        }
+      }
     }
 
     const normalizedMessages = (messages || []).map((m: any) => {
@@ -94,8 +175,32 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         }
       }
 
-      const mediaId = metadata?.media_id
-      const filename = metadata?.filename
+      const rowMediaId = (m as any)?.media_id
+      const rowFilename = (m as any)?.media_filename
+      const rowCaption = (m as any)?.media_caption
+      const rowMimeType = (m as any)?.media_mime_type
+
+      const mediaId =
+        metadata?.media_id ??
+        metadata?.mediaId ??
+        metadata?.id ??
+        rowMediaId ??
+        null
+
+      const filename =
+        metadata?.filename ??
+        metadata?.media_filename ??
+        metadata?.mediaFilename ??
+        rowFilename ??
+        null
+
+      // If media metadata lives in columns, expose a consistent shape to the UI
+      if (rowCaption && !metadata?.caption) {
+        metadata = { ...(metadata || {}), caption: rowCaption }
+      }
+      if (rowMimeType && !metadata?.mime_type) {
+        metadata = { ...(metadata || {}), mime_type: rowMimeType }
+      }
 
       let media_url: string | null = null
       if (mediaId) {
