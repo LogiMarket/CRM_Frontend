@@ -136,18 +136,18 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
         {/* Extra right padding prevents Radix scrollbar from covering text */}
         <div className="space-y-4 p-4 pr-6">
         {conversations.map((conv) => (
-          <div
-            key={conv.id}
-            onClick={() => onSelectConversation(conv.id)}
-            className={cn(
-              // NOTE: avoid `w-full` + right margin (it gets clipped). This keeps a real gutter before the chat divider.
-              "relative w-[calc(100%-1rem)] rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
-              selectedId === conv.id
-                ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-primary/25 ring-offset-2 ring-offset-muted/40 shadow-md"
-                : "border-border/70 hover:border-border hover:shadow-md",
-            )}
-          >
-            <div className="flex items-start gap-3">
+          // Wrapper creates a guaranteed right gutter before the chat divider
+          <div key={conv.id} className="pr-6">
+            <div
+              onClick={() => onSelectConversation(conv.id)}
+              className={cn(
+                "relative w-full rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
+                selectedId === conv.id
+                  ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-primary/25 ring-offset-2 ring-offset-muted/40 shadow-md"
+                  : "border-border/70 hover:border-border hover:shadow-md",
+              )}
+            >
+              <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
                 <Avatar className="h-11 w-11 ring-2 ring-background shadow-sm">
                   <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm">
@@ -194,6 +194,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
                   )}
                 </div>
               </div>
+            </div>
             </div>
           </div>
         ))}
