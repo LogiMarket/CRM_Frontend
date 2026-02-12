@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
-import { Send, MoreVertical, Phone, Video, Edit2, Trash2 } from "lucide-react"
+import { Send, MoreVertical, Phone, Video, Edit2, Trash2, Paperclip } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
@@ -47,10 +47,12 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
+  const [sendingMedia, setSendingMedia] = useState(false)
   const [editingMessageId, setEditingMessageId] = useState<number | string | null>(null)
   const [editingContent, setEditingContent] = useState("")
   const [scheduleCallOpen, setScheduleCallOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (conversationId) {
@@ -98,7 +100,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim() || !conversationId || sending) return
+    if (!newMessage.trim() || !conversationId || sending || sendingMedia) return
 
     const messageContent = newMessage
     setSending(true)
@@ -169,6 +171,63 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
       setNewMessage(messageContent)
     } finally {
       setSending(false)
+    }
+  }
+
+  const handlePickFile = () => {
+    if (!conversationId || sending || sendingMedia) return
+    fileInputRef.current?.click()
+  }
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !conversationId) return
+
+    // allow selecting the same file again later
+    e.target.value = ""
+
+    setSendingMedia(true)
+    const caption = newMessage.trim()
+    setNewMessage("")
+
+    try {
+      const form = new FormData()
+      form.append("file", file)
+      if (caption) form.append("caption", caption)
+
+      const response = await fetch(`/api/conversations/${conversationId}/send-media`, {
+        method: "POST",
+        body: form,
+      })
+
+      const data = await response.json().catch(() => null)
+      if (!response.ok) {
+        console.error("[ChatArea] Send media error:", response.status, data)
+        return
+      }
+
+      if (data?.message) {
+        const msg = data.message
+        setMessages([
+          ...messages,
+          {
+            id: msg.id,
+            content: msg.content,
+            sender_type: msg.sender_type || "agent",
+            sender_name: msg.sender_name || "Agent",
+            created_at: msg.created_at || new Date().toISOString(),
+            message_type: msg.message_type,
+            metadata: msg.metadata,
+            media_url: msg.media_url,
+          },
+        ])
+      } else {
+        await fetchMessages()
+      }
+    } catch (error) {
+      console.error("[ChatArea] Send media error:", error)
+    } finally {
+      setSendingMedia(false)
     }
   }
 
@@ -519,16 +578,32 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
           <MacrosDialog onSelectMacro={handleMacroSelect} />
         </div>
         <form onSubmit={handleSendMessage} className="flex gap-2">
+          <input
+            ref={fileInputRef}
+            type="file"
+            className="hidden"
+            onChange={handleFileSelected}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={handlePickFile}
+            disabled={sending || sendingMedia}
+            className="shrink-0"
+            title="Adjuntar archivo"
+          >
+            <Paperclip className="h-4 w-4" />
+          </Button>
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder="Escribe un mensaje..."
-            disabled={sending}
+            disabled={sending || sendingMedia}
             className="flex-1 transition-all focus:ring-2 focus:ring-primary"
           />
           <Button
             type="submit"
-            disabled={sending || !newMessage.trim()}
+            disabled={sending || sendingMedia || !newMessage.trim()}
             className="transition-all hover:scale-105 active:scale-95"
           >
             <Send className="h-4 w-4" />
