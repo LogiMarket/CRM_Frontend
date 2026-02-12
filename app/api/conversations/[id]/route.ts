@@ -19,22 +19,8 @@ export async function GET(
     }
 
     // Try UUID format first, then integer
-    let result: any = await sql!`
-      SELECT 
-        id, 
-        status, 
-        priority, 
-        contact_id,
-        assigned_agent_id,
-        comments,
-        created_at, 
-        last_message_at
-      FROM conversations 
-      WHERE id::text = ${id}
-      LIMIT 1
-    `
-
-    if (result.length === 0 && !isNaN(Number(id))) {
+    let result: any
+    try {
       result = await sql!`
         SELECT 
           id, 
@@ -46,9 +32,78 @@ export async function GET(
           created_at, 
           last_message_at
         FROM conversations 
-        WHERE id = ${Number.parseInt(id)}
+        WHERE id::text = ${id}
         LIMIT 1
       `
+    } catch (e: any) {
+      const message = String(e?.message || "")
+      const code = String(e?.code || "")
+      const missingComments =
+        message.includes("comments") ||
+        message.includes("column \"comments\"") ||
+        message.includes("column comments")
+
+      if ((code === "42703" || !code) && missingComments) {
+        result = await sql!`
+          SELECT 
+            id, 
+            status, 
+            priority, 
+            contact_id,
+            assigned_agent_id,
+            created_at, 
+            last_message_at
+          FROM conversations 
+          WHERE id::text = ${id}
+          LIMIT 1
+        `
+      } else {
+        throw e
+      }
+    }
+
+    if (result.length === 0 && !isNaN(Number(id))) {
+      try {
+        result = await sql!`
+          SELECT 
+            id, 
+            status, 
+            priority, 
+            contact_id,
+            assigned_agent_id,
+            comments,
+            created_at, 
+            last_message_at
+          FROM conversations 
+          WHERE id = ${Number.parseInt(id)}
+          LIMIT 1
+        `
+      } catch (e: any) {
+        const message = String(e?.message || "")
+        const code = String(e?.code || "")
+        const missingComments =
+          message.includes("comments") ||
+          message.includes("column \"comments\"") ||
+          message.includes("column comments")
+
+        if ((code === "42703" || !code) && missingComments) {
+          result = await sql!`
+            SELECT 
+              id, 
+              status, 
+              priority, 
+              contact_id,
+              assigned_agent_id,
+              created_at, 
+              last_message_at
+            FROM conversations 
+            WHERE id = ${Number.parseInt(id)}
+            LIMIT 1
+          `
+        } else {
+          throw e
+        }
+      }
     }
 
     if (result.length === 0) {
