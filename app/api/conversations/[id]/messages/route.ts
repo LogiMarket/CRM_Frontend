@@ -38,7 +38,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     // Query messages - try to get by UUID first, then try as integer.
     // Also support alternative schemas (e.g. CRM backend) where media fields may be stored in columns.
-    let messages = []
+    let messages: any[] = []
     try {
       messages = await sql`
         SELECT 

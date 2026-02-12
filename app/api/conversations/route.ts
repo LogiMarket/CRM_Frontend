@@ -38,7 +38,7 @@ export async function GET(request: Request) {
         status: conv.status,
         priority: conv.priority,
         last_message_at: conv.last_message_at,
-        assigned_agent_id: conv.assigned_agent_id,
+        assigned_agent_id: conv.assigned_to,
         contact_id: conv.contact_id,
         contact_name: conv.contact.name,
         phone_number: conv.contact.phone_number,

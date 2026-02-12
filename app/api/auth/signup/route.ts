@@ -1,7 +1,7 @@
 ﻿import { NextResponse } from "next/server"
 import { hash } from "bcryptjs"
 import { sql, isDemoMode } from "@/lib/db"
-import jwt from "jsonwebtoken"
+import { sign } from "jsonwebtoken"
 import crypto from "crypto"
 import { sendVerificationEmail } from "@/lib/email"
 
@@ -36,10 +36,11 @@ export async function POST(request: Request) {
 
     // En modo demo
     if (isDemoMode) {
-      const token = jwt.sign(
+      const expiresIn = (process.env.JWT_EXPIRATION ?? "7d") as any
+      const token = sign(
         { email, sub: Math.random().toString() },
-        process.env.JWT_SECRET || "demo-secret",
-        { expiresIn: process.env.JWT_EXPIRATION || "7d" },
+        process.env.JWT_SECRET ?? "demo-secret",
+        { expiresIn },
       )
 
       return NextResponse.json(
@@ -59,15 +60,6 @@ export async function POST(request: Request) {
           requiresVerification: false,
         },
         { status: 201 },
-      )
-    }
-
-    if (!sql) {
-      return NextResponse.json(
-        {
-          error: "Base de datos no configurada. Establece la variable DATABASE_URL.",
-        },
-        { status: 500 },
       )
     }
 
@@ -118,10 +110,11 @@ export async function POST(request: Request) {
     )
 
     // Generar token JWT (pero marcar que necesita verificar email)
-    const token = jwt.sign(
+    const expiresIn = (process.env.JWT_EXPIRATION ?? "7d") as any
+    const token = sign(
       { email: user.email, sub: user.id, emailVerified: false },
-      process.env.JWT_SECRET || "secret",
-      { expiresIn: process.env.JWT_EXPIRATION || "7d" },
+      process.env.JWT_SECRET ?? "secret",
+      { expiresIn },
     )
 
     return NextResponse.json(

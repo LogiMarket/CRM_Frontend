@@ -14,9 +14,18 @@ import { useAgentStats } from "@/hooks/use-agent-stats"
 import { useRouter } from "next/navigation"
 
 export default function AgentesPage() {
-  const [expandedAgentId, setExpandedAgentId] = useState<number | null>(null)
+  const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null)
   const { role, loading } = useUserRole()
   const router = useRouter()
+
+  interface AgentConversation {
+    id: string
+    contact_name: string
+    phone_number: string
+    last_message_at: string
+    status: "open" | "closed" | string
+    priority: "high" | "medium" | "normal" | "low" | string
+  }
 
   // Proteger acceso: solo admin y supervisor
   if (!loading && role !== "admin" && role !== "supervisor") {
@@ -53,11 +62,11 @@ export default function AgentesPage() {
       totalConversations: stat?.total_conversations || 0,
       closedConversations: stat?.resolved_conversations || 0,
       activeConversations: stat?.active_conversations || 0,
-      conversations: [],
+      conversations: [] as AgentConversation[],
     }
   })
 
-  const toggleAgentDetails = (agentId: number) => {
+  const toggleAgentDetails = (agentId: string) => {
     setExpandedAgentId(expandedAgentId === agentId ? null : agentId)
   }
 

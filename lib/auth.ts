@@ -24,7 +24,7 @@ export async function getUserByEmail(email: string): Promise<User | null> {
   if (isDemoMode) {
     const demoUser = DEMO_USERS.find((u) => u.email === email)
     if (demoUser) {
-      const { password_hash, ...userWithoutPassword } = demoUser
+      const { password: _password, ...userWithoutPassword } = demoUser
       return userWithoutPassword
     }
     return null
@@ -36,7 +36,16 @@ export async function getUserByEmail(email: string): Promise<User | null> {
     WHERE email = ${email}
     LIMIT 1
   `
-  return users.length > 0 ? users[0] : null
+  if (users.length === 0) return null
+  const row: any = users[0]
+  return {
+    id: Number(row.id),
+    email: String(row.email),
+    name: String(row.name),
+    role: String(row.role),
+    avatar_url: row.avatar_url ?? undefined,
+    status: String(row.status),
+  }
 }
 
 export async function authenticateUser(email: string, password: string): Promise<User | null> {
@@ -78,6 +87,13 @@ export async function authenticateUser(email: string, password: string): Promise
   }
 
   // Return user without password_hash
-  const { password_hash, ...userWithoutPassword } = user
-  return userWithoutPassword
+  const row: any = user
+  return {
+    id: Number(row.id),
+    email: String(row.email),
+    name: String(row.name),
+    role: String(row.role),
+    avatar_url: row.avatar_url ?? undefined,
+    status: String(row.status),
+  }
 }

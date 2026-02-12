@@ -11,7 +11,7 @@ import { useConversations } from "@/hooks/use-conversations"
 import { RefreshCw } from "lucide-react"
 
 interface Conversation {
-  id: string
+  id: number
   contact_name: string
   phone_number: string
   contact_avatar?: string
@@ -25,8 +25,8 @@ interface Conversation {
 }
 
 interface ConversationListProps {
-  selectedId?: string
-  onSelectConversation: (id: string) => void
+  selectedId?: number
+  onSelectConversation: (id: number) => void
   onlyAssigned?: boolean
 }
 
@@ -34,19 +34,25 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
   const { conversations: backendConversations, loading, refreshing, error } = useConversations(onlyAssigned)
   
   // Transform backend data to component format
-  const conversations = backendConversations.map(conv => ({
-    id: String(conv.id),
-    contact_name: conv.customer_name,
-    phone_number: conv.customer_phone,
-    contact_avatar: undefined,
-    last_message: conv.last_message?.content || "Sin mensajes",
-    last_message_at: conv.last_message?.created_at || conv.created_at,
-    unread_count: conv.unread_count,
-    status: conv.status,
-    priority: conv.priority,
-    agent_name: undefined, // TODO: fetch from assigned_agent_id
-    channel: conv.channel || 'whatsapp',
-  }))
+  const conversations: Conversation[] = backendConversations
+    .map((conv): Conversation | null => {
+      const id = typeof conv.id === "number" ? conv.id : Number.parseInt(String(conv.id), 10)
+      if (!Number.isFinite(id)) return null
+      return {
+        id,
+        contact_name: conv.customer_name,
+        phone_number: conv.customer_phone,
+        contact_avatar: undefined as string | undefined,
+        last_message: conv.last_message?.content || "Sin mensajes",
+        last_message_at: conv.last_message?.created_at || conv.created_at,
+        unread_count: conv.unread_count,
+        status: conv.status,
+        priority: conv.priority,
+        agent_name: undefined, // TODO: fetch from assigned_agent_id
+        channel: conv.channel || "whatsapp",
+      }
+    })
+    .filter((c): c is Conversation => c !== null)
 
   const getInitials = (name: string) => {
     return name
@@ -135,18 +141,17 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
   return (
     <div className="h-full flex flex-col bg-background">
       <ScrollArea className="flex-1">
-        <div className="space-y-2 p-3">
+        <div className="space-y-3 p-3">
         {conversations.map((conv) => (
           <div
             key={conv.id}
             onClick={() => onSelectConversation(conv.id)}
             className={cn(
-              "relative rounded-xl p-4 text-left transition-all duration-200 cursor-pointer",
-              "bg-card border-2 shadow-sm hover:shadow-lg",
-              "hover:border-primary/50 hover:scale-[1.02]",
-              selectedId === conv.id 
-                ? "border-primary bg-primary/5 shadow-md" 
-                : "border-border hover:bg-accent/50",
+              "relative w-full overflow-hidden rounded-xl p-4 text-left transition-colors duration-150 cursor-pointer",
+              "bg-card border shadow-sm",
+              selectedId === conv.id
+                ? "border-primary/60 bg-primary/10 ring-1 ring-primary/20"
+                : "border-border/70 hover:bg-accent/40 hover:border-border",
             )}
           >
             <div className="flex items-start gap-3">

@@ -12,7 +12,7 @@ export default function ConversacionesPage() {
   const [selectedContactName, setSelectedContactName] = useState<string>()
   const [selectedContactId, setSelectedContactId] = useState<number>()
   const [currentAgentId, setCurrentAgentId] = useState<number>()
-  const [selectedChannel, setSelectedChannel] = useState<string>('whatsapp')
+  const [selectedChannel, setSelectedChannel] = useState<string>("whatsapp")
   const [selectedExternalUserId, setSelectedExternalUserId] = useState<string>()
   const [refreshKey, setRefreshKey] = useState(0)
   const { role } = useUserRole()
@@ -25,12 +25,12 @@ export default function ConversacionesPage() {
     fetch(`/api/conversations`)
       .then((res) => res.json())
       .then((data) => {
-        const conv = data.conversations.find((c: any) => c.id === id)
+        const conv = (data.conversations || []).find((c: any) => Number(c.id) === id)
         if (conv) {
           setSelectedContactName(conv.contact_name)
           setSelectedContactId(conv.contact_id)
           setCurrentAgentId(conv.assigned_agent_id)
-          setSelectedChannel(conv.channel || 'whatsapp')
+          setSelectedChannel(conv.channel || "whatsapp")
           setSelectedExternalUserId(conv.external_user_id)
         }
       })
@@ -65,7 +65,7 @@ export default function ConversacionesPage() {
         </div>
 
         <div className="flex h-full w-96 flex-col border-l border-border bg-card">
-          <OrdersPanel contactId={selectedContactId} />
+          <OrdersPanel conversationId={selectedConversationId} onUpdate={handleUpdate} />
         </div>
       </div>
     </>
