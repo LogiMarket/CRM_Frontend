@@ -133,14 +133,14 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
   return (
     <div className="h-full flex flex-col bg-transparent">
       <ScrollArea className="flex-1">
-        {/* Extra right padding prevents Radix scrollbar from covering text */}
-        <div className="space-y-4 p-4 pr-4">
+        {/* Match reference UI: compact cards with consistent inner margin */}
+        <div className="space-y-3 px-4 py-4 pr-6">
         {conversations.map((conv) => (
           <div
             key={conv.id}
             onClick={() => onSelectConversation(conv.id)}
             className={cn(
-              "relative w-full rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
+              "relative box-border w-full rounded-lg border bg-background p-3 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
               selectedId === conv.id
                 ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-inset ring-primary/25 shadow-md"
                 : "border-border/70 hover:border-border hover:shadow-md",
@@ -148,7 +148,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
           >
             <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
-                <Avatar className="h-11 w-11 ring-2 ring-background shadow-sm">
+                <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
                   <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm">
                     {getInitials(conv.contact_name)}
                   </AvatarFallback>
@@ -168,7 +168,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
                     {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: es })}
                   </span>
                 </div>
-                <p className="line-clamp-2 text-muted-foreground text-xs leading-relaxed mb-2">
+                <p className="line-clamp-1 text-muted-foreground text-xs leading-relaxed mb-2">
                   {conv.last_message || "Sin mensajes"}
                 </p>
                 <div className="flex items-center gap-1.5 flex-wrap">
