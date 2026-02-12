@@ -10,11 +10,12 @@ import { useContacts, type Contact } from "@/hooks/use-contacts"
 
 interface ContactsListProps {
   selectedId?: string
-  onSelect: (contact: Contact) => void
+  onSelect?: (contact: Contact) => void
+  onChat: (contact: Contact) => void
   headerRight?: React.ReactNode
 }
 
-export function ContactsList({ selectedId, onSelect, headerRight }: ContactsListProps) {
+export function ContactsList({ selectedId, onSelect, onChat, headerRight }: ContactsListProps) {
   const { contacts, loading, error, refetch } = useContacts()
   const [query, setQuery] = useState("")
 
@@ -87,7 +88,7 @@ export function ContactsList({ selectedId, onSelect, headerRight }: ContactsList
         </div>
 
         <ScrollArea className="h-[calc(100%-112px)]">
-          <div className="space-y-2 p-3">
+          <div className="space-y-2 p-3 pr-4">
             {filteredContacts.length === 0 ? (
               <div className="rounded-lg border bg-background p-4 text-center text-sm text-muted-foreground">
                 {contacts.length === 0 ? "No hay contactos" : "Sin resultados"}
@@ -101,9 +102,9 @@ export function ContactsList({ selectedId, onSelect, headerRight }: ContactsList
                 return (
                   <div
                     key={String(c.id)}
-                    onClick={() => onSelect(c)}
+                    onClick={() => onSelect?.(c)}
                     className={cn(
-                      "w-full rounded-lg border bg-background p-3 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 hover:shadow-md",
+                      "w-full rounded-lg border bg-background p-3 text-left transition-[background-color,border-color] duration-150 hover:bg-muted/30",
                       selectedId === String(c.id)
                         ? "border-primary/60 bg-primary/10 ring-2 ring-inset ring-primary/25"
                         : "border-border/70 hover:border-border",
@@ -113,7 +114,7 @@ export function ContactsList({ selectedId, onSelect, headerRight }: ContactsList
                     onKeyDown={(e) => {
                       if (e.key === "Enter" || e.key === " ") {
                         e.preventDefault()
-                        onSelect(c)
+                        onSelect?.(c)
                       }
                     }}
                   >
@@ -142,10 +143,11 @@ export function ContactsList({ selectedId, onSelect, headerRight }: ContactsList
                         <Button
                           size="sm"
                           variant="outline"
+                          className="whitespace-nowrap"
                           onClick={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
-                            onSelect(c)
+                            onChat(c)
                           }}
                         >
                           Chatear

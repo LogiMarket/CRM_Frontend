@@ -47,18 +47,18 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => ({}))
     const contactIdRaw = body?.contactId ?? body?.contact_id
-    const contactId = contactIdRaw !== undefined && contactIdRaw !== null ? Number(contactIdRaw) : NaN
+    const contactIdText = String(contactIdRaw ?? "").trim()
 
-    if (!contactId || Number.isNaN(contactId)) {
+    if (!contactIdText) {
       return NextResponse.json({ error: "contactId is required" }, { status: 400 })
     }
 
     if (isDemoMode) {
-      const existing = DEMO_CONVERSATIONS.find((c) => c.contact_id === contactId && c.status !== "closed")
+      const existing = DEMO_CONVERSATIONS.find((c) => String(c.contact_id) === contactIdText && c.status !== "closed")
       if (!existing) {
         return NextResponse.json({
-          conversation: { id: Date.now(), contact_id: contactId, status: "open", priority: "medium" },
-          contact: { id: contactId },
+          conversation: { id: Date.now(), contact_id: contactIdText, status: "open", priority: "medium" },
+          contact: { id: contactIdText },
           demo: true,
         })
       }
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
     const contactRows: any[] = await sql!`
       SELECT *
       FROM contacts
-      WHERE id = ${contactId}
+      WHERE id::text = ${contactIdText}
       LIMIT 1
     `
 
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
       conversationRows = await sql!`
         SELECT *
         FROM conversations
-        WHERE contact_id = ${contactId}
+        WHERE contact_id = ${contact.id}
           AND status IN ('open', 'assigned')
         ORDER BY created_at DESC
         LIMIT 1
@@ -120,7 +120,7 @@ export async function POST(request: Request) {
             last_message_at
           )
           VALUES (
-            ${contactId},
+            ${contact.id},
             'open',
             'medium',
             ${channel},
@@ -145,7 +145,7 @@ export async function POST(request: Request) {
             last_message_at
           )
           VALUES (
-            ${contactId},
+            ${contact.id},
             'open',
             'medium',
             ${channel},
@@ -167,7 +167,7 @@ export async function POST(request: Request) {
             last_message_at
           )
           VALUES (
-            ${contactId},
+            ${contact.id},
             'open',
             'medium',
             NOW(),

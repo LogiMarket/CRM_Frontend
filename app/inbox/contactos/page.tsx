@@ -1,10 +1,9 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { InboxHeader } from "@/components/inbox-header"
 import { ContactsList } from "@/components/contacts-list"
-import { ChatArea } from "@/components/chat-area"
-import { OrdersPanel } from "@/components/orders-panel"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -21,11 +20,8 @@ import { toast } from "@/hooks/use-toast"
 import type { Contact } from "@/hooks/use-contacts"
 
 export default function ContactosPage() {
+  const router = useRouter()
   const [selectedContactId, setSelectedContactId] = useState<string>()
-  const [selectedConversationId, setSelectedConversationId] = useState<string>()
-  const [selectedContactName, setSelectedContactName] = useState<string>()
-  const [selectedChannel, setSelectedChannel] = useState<string>("whatsapp")
-  const [selectedExternalUserId, setSelectedExternalUserId] = useState<string>()
   const [refreshKey, setRefreshKey] = useState(0)
 
   const [newOpen, setNewOpen] = useState(false)
@@ -35,22 +31,18 @@ export default function ContactosPage() {
   const [newPhone, setNewPhone] = useState("")
   const [newExternalUserId, setNewExternalUserId] = useState("")
 
-  const ordersPanelContactId = useMemo(() => {
-    const n = Number(selectedContactId)
-    return Number.isFinite(n) ? n : undefined
-  }, [selectedContactId])
-
-  const handleSelectContact = async (contact: Contact) => {
+  const handleSelectContact = (contact: Contact) => {
     setSelectedContactId(String(contact.id))
-    setSelectedContactName(String(contact.name || ""))
-    setSelectedChannel(String(contact.channel || "whatsapp"))
-    setSelectedExternalUserId(contact.external_user_id ? String(contact.external_user_id) : undefined)
+  }
+
+  const handleChatContact = async (contact: Contact) => {
+    setSelectedContactId(String(contact.id))
 
     try {
       const res = await fetch("/api/conversations/ensure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactId: contact.id }),
+        body: JSON.stringify({ contactId: String(contact.id) }),
       })
 
       const data = await res.json().catch(() => null)
@@ -59,10 +51,13 @@ export default function ContactosPage() {
         return
       }
 
-      setSelectedConversationId(String(data?.conversation?.id))
-      if (data?.contact?.name) setSelectedContactName(String(data.contact.name))
-      if (data?.conversation?.channel) setSelectedChannel(String(data.conversation.channel))
-      if (data?.conversation?.external_user_id) setSelectedExternalUserId(String(data.conversation.external_user_id))
+      const conversationId = data?.conversation?.id ? String(data.conversation.id) : ""
+      if (!conversationId) {
+        toast({ title: "Error", description: "No se pudo crear/obtener la conversación", variant: "destructive" })
+        return
+      }
+
+      router.push(`/inbox/conversaciones?conversationId=${encodeURIComponent(conversationId)}`)
     } catch (e) {
       toast({ title: "Error", description: e instanceof Error ? e.message : "No se pudo abrir la conversación", variant: "destructive" })
     }
@@ -114,6 +109,7 @@ export default function ContactosPage() {
             key={refreshKey}
             selectedId={selectedContactId}
             onSelect={handleSelectContact}
+            onChat={handleChatContact}
             headerRight={
               <Dialog open={newOpen} onOpenChange={setNewOpen}>
                 <DialogTrigger asChild>
@@ -184,19 +180,19 @@ export default function ContactosPage() {
         <div className="w-4 flex-shrink-0 bg-muted/40" aria-hidden="true" />
 
         <div className="flex flex-1 flex-col min-w-0">
-          <ChatArea
-            conversationId={selectedConversationId}
-            contactName={selectedContactName}
-            channel={selectedChannel}
-            externalUserId={selectedExternalUserId}
-            onUpdate={handleUpdate}
-          />
-        </div>
-
-        <div className="w-4 flex-shrink-0 bg-muted/40" aria-hidden="true" />
-
-        <div className="hidden xl:flex h-full w-72 flex-col border-l border-border bg-card flex-shrink-0">
-          <OrdersPanel contactId={ordersPanelContactId} />
+          <div className="flex h-full items-center justify-center p-6">
+            <div className="max-w-lg rounded-xl border bg-card p-6 text-center shadow-sm">
+              <p className="text-lg font-semibold">Contactos</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Selecciona un contacto y presiona <span className="font-medium">Chatear</span> para ir a Conversaciones.
+              </p>
+              {selectedContactId && (
+                <p className="mt-3 text-xs text-muted-foreground">
+                  Contacto seleccionado: <span className="font-medium">{selectedContactId}</span>
+                </p>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </>

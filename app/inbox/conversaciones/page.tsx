@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useCallback, useEffect, useState } from "react"
+import { useSearchParams } from "next/navigation"
 import { InboxHeader } from "@/components/inbox-header"
 import { ConversationList } from "@/components/conversation-list"
 import { ChatArea } from "@/components/chat-area"
@@ -8,6 +9,7 @@ import { OrdersPanel } from "@/components/orders-panel"
 import { useUserRole } from "@/hooks/use-user-role"
 
 export default function ConversacionesPage() {
+  const searchParams = useSearchParams()
   const [selectedConversationId, setSelectedConversationId] = useState<string>()
   const [selectedContactName, setSelectedContactName] = useState<string>()
   const [selectedContactId, setSelectedContactId] = useState<number>()
@@ -20,7 +22,7 @@ export default function ConversacionesPage() {
   // Agentes solo ven conversaciones asignadas
   const onlyAssigned = role === "agent"
 
-  const handleSelectConversation = (id: string) => {
+  const handleSelectConversation = useCallback((id: string) => {
     setSelectedConversationId(id)
     fetch(`/api/conversations`)
       .then((res) => res.json())
@@ -34,7 +36,15 @@ export default function ConversacionesPage() {
           setSelectedExternalUserId(conv.external_user_id)
         }
       })
-  }
+  }, [])
+
+  // Si llegamos desde Contactos con ?conversationId=..., seleccionarla automáticamente.
+  useEffect(() => {
+    const id = searchParams.get("conversationId")
+    if (!id) return
+    if (String(selectedConversationId || "") === String(id)) return
+    handleSelectConversation(String(id))
+  }, [handleSelectConversation, searchParams, selectedConversationId])
 
   const handleUpdate = () => {
     setRefreshKey((prev) => prev + 1)
