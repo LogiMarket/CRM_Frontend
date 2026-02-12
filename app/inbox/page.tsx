@@ -121,7 +121,7 @@ export default function InboxPage() {
       <InboxHeader />
       <div className="flex h-full flex-1 overflow-hidden gap-0">
         {/* Conversations list - responsive width */}
-        <div className="hidden md:flex h-full w-full md:w-80 lg:w-96 flex-col border-r border-border bg-muted/40 flex-shrink-0">
+        <div className="hidden md:flex h-full w-80 flex-col border-r border-border bg-card flex-shrink-0">
           <ConversationList
             key={refreshKey}
             selectedId={selectedConversationId}
@@ -141,7 +141,7 @@ export default function InboxPage() {
 
         {/* Orders/Details panel - responsive */}
         {showOrdersPanel && (
-          <div className="hidden xl:flex h-full w-full xl:w-96 2xl:w-[28rem] flex-col border-l border-border bg-card flex-shrink-0 overflow-hidden">
+          <div className="hidden xl:flex h-full w-72 flex-col border-l border-border bg-card flex-shrink-0 overflow-hidden">
               <OrdersPanel 
                 conversationDetails={conversationDetails}
                 onUpdate={handleUpdate}

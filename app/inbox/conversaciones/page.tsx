@@ -44,7 +44,7 @@ export default function ConversacionesPage() {
     <>
       <InboxHeader />
       <div className="flex flex-1 overflow-hidden">
-        <div className="flex h-full w-96 flex-col border-r border-border bg-muted/40">
+        <div className="flex h-full w-80 flex-col border-r border-border bg-card flex-shrink-0">
           <ConversationList
             key={refreshKey}
             selectedId={selectedConversationId}
@@ -53,7 +53,7 @@ export default function ConversacionesPage() {
           />
         </div>
 
-        <div className="flex flex-1 flex-col">
+        <div className="flex flex-1 flex-col min-w-0">
           <ChatArea
             conversationId={selectedConversationId}
             contactName={selectedContactName}
@@ -64,7 +64,7 @@ export default function ConversacionesPage() {
           />
         </div>
 
-        <div className="flex h-full w-96 flex-col border-l border-border bg-card">
+        <div className="flex h-full w-72 flex-col border-l border-border bg-card flex-shrink-0">
           <OrdersPanel contactId={selectedContactId} />
         </div>
       </div>
