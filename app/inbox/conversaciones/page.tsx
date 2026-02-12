@@ -43,7 +43,7 @@ export default function ConversacionesPage() {
   return (
     <>
       <InboxHeader />
-      <div className="flex flex-1 overflow-hidden">
+      <div className="flex flex-1 overflow-hidden gap-4">
         <div className="flex h-full w-80 flex-col border-r border-border bg-card flex-shrink-0">
           <ConversationList
             key={refreshKey}
