@@ -1,6 +1,5 @@
 "use client"
 
-import { useEffect, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -8,7 +7,6 @@ import { cn } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import { useConversations } from "@/hooks/use-conversations"
-import { RefreshCw } from "lucide-react"
 
 interface Conversation {
   id: string
@@ -133,19 +131,18 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
   }
 
   return (
-    <div className="h-full flex flex-col bg-background">
+    <div className="h-full flex flex-col bg-muted/20">
       <ScrollArea className="flex-1">
-        <div className="space-y-3 p-3">
+        <div className="space-y-4 p-4">
         {conversations.map((conv) => (
           <div
             key={conv.id}
             onClick={() => onSelectConversation(conv.id)}
             className={cn(
-              "relative w-full overflow-hidden rounded-xl p-4 text-left transition-colors duration-150 cursor-pointer",
-              "bg-card border shadow-sm",
+              "relative w-full rounded-xl border bg-card p-4 text-left shadow-sm transition-all duration-150 cursor-pointer",
               selectedId === conv.id
-                ? "border-primary/60 bg-primary/10 ring-1 ring-primary/20"
-                : "border-border/70 hover:bg-accent/40 hover:border-border",
+                ? "border-primary/70 bg-primary/5 ring-1 ring-primary/20 shadow-md"
+                : "border-border/70 hover:border-border hover:bg-card/90 hover:shadow-md",
             )}
           >
             <div className="flex items-start gap-3">

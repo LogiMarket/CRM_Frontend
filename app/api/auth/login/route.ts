@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { authenticateUser } from "@/lib/auth"
 import jwt from "jsonwebtoken"
+import type { Secret, SignOptions } from "jsonwebtoken"
 
 export async function POST(request: Request) {
   try {
@@ -25,10 +26,12 @@ export async function POST(request: Request) {
     }
 
     // Generate JWT token
+    const secret = (process.env.JWT_SECRET || "secret") as Secret
+    const expiresIn = (process.env.JWT_EXPIRATION || "7d") as SignOptions["expiresIn"]
     const token = jwt.sign(
       { email: user.email, sub: user.id },
-      process.env.JWT_SECRET || "secret",
-      { expiresIn: process.env.JWT_EXPIRATION || "7d" },
+      secret,
+      { expiresIn },
     )
 
     return NextResponse.json(

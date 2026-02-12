@@ -14,7 +14,7 @@ import { useAgentStats } from "@/hooks/use-agent-stats"
 import { useRouter } from "next/navigation"
 
 export default function AgentesPage() {
-  const [expandedAgentId, setExpandedAgentId] = useState<number | null>(null)
+  const [expandedAgentId, setExpandedAgentId] = useState<string | null>(null)
   const { role, loading } = useUserRole()
   const router = useRouter()
 
@@ -46,6 +46,15 @@ export default function AgentesPage() {
   const { stats, loading: loadingStats } = useAgentStats()
 
   // Merge agents with their stats
+  type AgentConversation = {
+    id: string | number
+    contact_name: string
+    status: string
+    priority: string
+    phone_number: string
+    last_message_at: string
+  }
+
   const agentStats = agents.map((agent) => {
     const stat = stats.find((s) => s.id === agent.id)
     return {
@@ -53,11 +62,11 @@ export default function AgentesPage() {
       totalConversations: stat?.total_conversations || 0,
       closedConversations: stat?.resolved_conversations || 0,
       activeConversations: stat?.active_conversations || 0,
-      conversations: [],
+      conversations: [] as AgentConversation[],
     }
   })
 
-  const toggleAgentDetails = (agentId: number) => {
+  const toggleAgentDetails = (agentId: string) => {
     setExpandedAgentId(expandedAgentId === agentId ? null : agentId)
   }
 

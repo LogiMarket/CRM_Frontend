@@ -2,6 +2,7 @@
 import { hash } from "bcryptjs"
 import { sql, isDemoMode } from "@/lib/db"
 import jwt from "jsonwebtoken"
+import type { Secret, SignOptions } from "jsonwebtoken"
 import crypto from "crypto"
 import { sendVerificationEmail } from "@/lib/email"
 
@@ -36,10 +37,12 @@ export async function POST(request: Request) {
 
     // En modo demo
     if (isDemoMode) {
+      const secret = (process.env.JWT_SECRET || "demo-secret") as Secret
+      const expiresIn = (process.env.JWT_EXPIRATION || "7d") as SignOptions["expiresIn"]
       const token = jwt.sign(
         { email, sub: Math.random().toString() },
-        process.env.JWT_SECRET || "demo-secret",
-        { expiresIn: process.env.JWT_EXPIRATION || "7d" },
+        secret,
+        { expiresIn },
       )
 
       return NextResponse.json(
@@ -118,10 +121,12 @@ export async function POST(request: Request) {
     )
 
     // Generar token JWT (pero marcar que necesita verificar email)
+    const secret = (process.env.JWT_SECRET || "secret") as Secret
+    const expiresIn = (process.env.JWT_EXPIRATION || "7d") as SignOptions["expiresIn"]
     const token = jwt.sign(
       { email: user.email, sub: user.id, emailVerified: false },
-      process.env.JWT_SECRET || "secret",
-      { expiresIn: process.env.JWT_EXPIRATION || "7d" },
+      secret,
+      { expiresIn },
     )
 
     return NextResponse.json(

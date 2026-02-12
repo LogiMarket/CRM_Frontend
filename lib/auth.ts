@@ -24,18 +24,18 @@ export async function getUserByEmail(email: string): Promise<User | null> {
   if (isDemoMode) {
     const demoUser = DEMO_USERS.find((u) => u.email === email)
     if (demoUser) {
-      const { password_hash, ...userWithoutPassword } = demoUser
+      const { password: _, ...userWithoutPassword } = demoUser
       return userWithoutPassword
     }
     return null
   }
 
-  const users = await sql`
+  const users = (await sql`
     SELECT id, email, name, role, avatar_url, status
     FROM users
     WHERE email = ${email}
     LIMIT 1
-  `
+  `) as unknown as User[]
   return users.length > 0 ? users[0] : null
 }
 
@@ -59,12 +59,12 @@ export async function authenticateUser(email: string, password: string): Promise
     return userWithoutPassword
   }
 
-  const users = await sql`
+  const users = (await sql`
     SELECT id, email, password_hash, name, role, avatar_url, status
     FROM users
     WHERE email = ${email}
     LIMIT 1
-  `
+  `) as unknown as Array<User & { password_hash: string }>
 
   if (users.length === 0) {
     return null
@@ -79,5 +79,5 @@ export async function authenticateUser(email: string, password: string): Promise
 
   // Return user without password_hash
   const { password_hash, ...userWithoutPassword } = user
-  return userWithoutPassword
+  return userWithoutPassword as User
 }
