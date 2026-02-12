@@ -8,10 +8,12 @@ let _hasConversationChannelCols: boolean | null = null
 let _hasMessagesExtendedCols: boolean | null = null
 let _messagesConversationIdType: "uuid" | "number" | "unknown" | null = null
 
-async function hasConversationChannelCols(): Promise<boolean> {
+type Db = NonNullable<typeof sql>
+
+async function hasConversationChannelCols(db: Db): Promise<boolean> {
   if (_hasConversationChannelCols !== null) return _hasConversationChannelCols
   try {
-    const rows = await sql!`
+    const rows = await db`
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'conversations'
@@ -25,10 +27,10 @@ async function hasConversationChannelCols(): Promise<boolean> {
   return _hasConversationChannelCols
 }
 
-async function hasMessagesExtendedCols(): Promise<boolean> {
+async function hasMessagesExtendedCols(db: Db): Promise<boolean> {
   if (_hasMessagesExtendedCols !== null) return _hasMessagesExtendedCols
   try {
-    const rows = await sql!`
+    const rows = await db`
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'messages'
@@ -42,10 +44,10 @@ async function hasMessagesExtendedCols(): Promise<boolean> {
   return _hasMessagesExtendedCols
 }
 
-async function getMessagesConversationIdType(): Promise<"uuid" | "number" | "unknown"> {
+async function getMessagesConversationIdType(db: Db): Promise<"uuid" | "number" | "unknown"> {
   if (_messagesConversationIdType) return _messagesConversationIdType
   try {
-    const rows = await sql!`
+    const rows = await db`
       SELECT data_type, udt_name
       FROM information_schema.columns
       WHERE table_name = 'messages'
@@ -107,6 +109,18 @@ export async function POST(
       )
     }
 
+    if (!sql) {
+      return NextResponse.json(
+        {
+          error: "DATABASE_URL missing",
+          hint: "Configura DATABASE_URL en Railway. Este endpoint requiere acceso a Postgres para buscar el destinatario y guardar el mensaje.",
+        },
+        { status: 500 },
+      )
+    }
+
+    const db = sql
+
     const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
     const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
 
@@ -151,9 +165,9 @@ export async function POST(
 
     // Lookup recipient (WhatsApp "to") by conversation id
     let recipientDigits = ""
-    const includeConvChannel = await hasConversationChannelCols()
+    const includeConvChannel = await hasConversationChannelCols(db)
     const convRows = includeConvChannel
-      ? await sql!`
+      ? await db`
           SELECT
             conv.channel,
             conv.external_user_id,
@@ -163,7 +177,7 @@ export async function POST(
           WHERE conv.id::text = ${id}
           LIMIT 1
         `
-      : await sql!`
+      : await db`
           SELECT
             c.phone_number
           FROM conversations conv
@@ -277,8 +291,8 @@ export async function POST(
     // 3) Store message in DB (best-effort, compatible with multiple schemas)
     let inserted: any = null
     try {
-      const useExtended = await hasMessagesExtendedCols()
-      const convIdType = await getMessagesConversationIdType()
+      const useExtended = await hasMessagesExtendedCols(db)
+      const convIdType = await getMessagesConversationIdType(db)
 
       const idString = String(id)
       const idAsNumber = Number.parseInt(idString, 10)
@@ -291,10 +305,10 @@ export async function POST(
       } else if (convIdType === "number" && !canUseNumber) {
         inserted = null
       } else {
-        const conversationIdValue = canUseUuid ? sql`${idString}::uuid` : sql`${idAsNumber}`
+        const conversationIdValue = canUseUuid ? db`${idString}::uuid` : db`${idAsNumber}`
 
         const rows = useExtended
-          ? await sql!`
+          ? await db`
               INSERT INTO messages (
                 conversation_id,
                 sender_type,
@@ -321,7 +335,7 @@ export async function POST(
               )
               RETURNING id, content, sender_type, sender_id, created_at, message_type, metadata
             `
-          : await sql!`
+          : await db`
               INSERT INTO messages (
                 conversation_id,
                 sender_type,
@@ -352,7 +366,7 @@ export async function POST(
 
     // Update conversation timestamps (best-effort)
     try {
-      await sql!`
+      await db`
         UPDATE conversations
         SET last_message_at = NOW(), updated_at = NOW()
         WHERE id::text = ${id}
