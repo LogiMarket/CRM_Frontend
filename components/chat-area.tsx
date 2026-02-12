@@ -23,11 +23,14 @@ import {
 } from "@/components/ui/dropdown-menu"
 
 interface Message {
-  id: number
+  id: number | string
   content: string
   sender_type: string
   sender_name: string
   created_at: string
+  message_type?: string
+  metadata?: any
+  media_url?: string | null
 }
 
 interface ChatAreaProps {
@@ -44,7 +47,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
-  const [editingMessageId, setEditingMessageId] = useState<number | null>(null)
+  const [editingMessageId, setEditingMessageId] = useState<number | string | null>(null)
   const [editingContent, setEditingContent] = useState("")
   const [scheduleCallOpen, setScheduleCallOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -173,7 +176,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
     setNewMessage(content)
   }
 
-  const handleEditMessage = async (messageId: number) => {
+  const handleEditMessage = async (messageId: number | string) => {
     if (!editingContent.trim() || !conversationId) return
 
     try {
@@ -200,7 +203,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
     }
   }
 
-  const handleDeleteMessage = async (messageId: number) => {
+  const handleDeleteMessage = async (messageId: number | string) => {
     if (!conversationId) return
 
     try {
@@ -217,6 +220,74 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
     } catch (error) {
       console.error("Error deleting message:", error)
     }
+  }
+
+  const renderMessageBody = (msg: Message) => {
+    const type = msg.message_type || "text"
+    const mediaUrl = msg.media_url || null
+    const filename = msg?.metadata?.filename || msg?.metadata?.media_filename || ""
+    const caption = msg?.metadata?.caption || ""
+
+    if (!mediaUrl || type === "text") {
+      return <p className="text-sm leading-relaxed">{msg.content}</p>
+    }
+
+    if (type === "image" || type === "sticker") {
+      return (
+        <div className="space-y-2">
+          <img
+            src={mediaUrl}
+            alt={caption || filename || "imagen"}
+            className="max-w-full rounded-md border border-border"
+            loading="lazy"
+          />
+          {(caption || msg.content) && (
+            <p className="text-sm leading-relaxed">{caption || msg.content}</p>
+          )}
+        </div>
+      )
+    }
+
+    if (type === "video") {
+      return (
+        <div className="space-y-2">
+          <video
+            src={mediaUrl}
+            controls
+            className="max-w-full rounded-md border border-border"
+          />
+          {(caption || msg.content) && (
+            <p className="text-sm leading-relaxed">{caption || msg.content}</p>
+          )}
+        </div>
+      )
+    }
+
+    if (type === "audio") {
+      return (
+        <div className="space-y-2">
+          <audio src={mediaUrl} controls className="w-full" />
+          {(caption || msg.content) && (
+            <p className="text-sm leading-relaxed">{caption || msg.content}</p>
+          )}
+        </div>
+      )
+    }
+
+    // document or unknown media types: show link
+    return (
+      <div className="space-y-1">
+        <a
+          href={mediaUrl}
+          target="_blank"
+          rel="noreferrer"
+          className="underline underline-offset-2 text-sm break-all"
+        >
+          {filename || msg.content || "Ver archivo"}
+        </a>
+        {caption && <p className="text-sm leading-relaxed">{caption}</p>}
+      </div>
+    )
   }
 
   const getInitials = (name: string) => {
@@ -394,7 +465,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
                               : "bg-card text-foreground border border-border group-hover:ring-muted-foreground/30",
                           )}
                         >
-                          <p className="text-sm leading-relaxed">{msg.content}</p>
+                          {renderMessageBody(msg)}
                         </div>
                         {showTimestamp && (
                           <p className="text-muted-foreground text-xs px-1">

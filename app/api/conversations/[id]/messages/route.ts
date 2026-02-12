@@ -43,6 +43,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         SELECT 
           m.id,
           m.content,
+          m.message_type,
+          m.metadata,
           m.sender_type,
           m.sender_id,
           m.created_at,
@@ -52,7 +54,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             'Unknown'
           ) as sender_name
         FROM messages m
-        LEFT JOIN contacts c ON m.sender_type = 'contact' AND m.sender_id = c.id
+        LEFT JOIN contacts c ON m.sender_type IN ('contact','customer') AND m.sender_id = c.id
         LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
         WHERE m.conversation_id::text = ${id}
         ORDER BY m.created_at ASC
@@ -64,6 +66,8 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
         SELECT 
           m.id,
           m.content,
+          m.message_type,
+          m.metadata,
           m.sender_type,
           m.sender_id,
           m.created_at,
@@ -73,12 +77,40 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
             'Unknown'
           ) as sender_name
         FROM messages m
-        LEFT JOIN contacts c ON m.sender_type = 'contact' AND m.sender_id = c.id
+        LEFT JOIN contacts c ON m.sender_type IN ('contact','customer') AND m.sender_id = c.id
         LEFT JOIN users u ON m.sender_type = 'agent' AND m.sender_id = u.id
         WHERE CAST(m.conversation_id AS VARCHAR) = ${id}
         ORDER BY m.created_at ASC
       `
     }
+
+    const normalizedMessages = (messages || []).map((m: any) => {
+      let metadata: any = m.metadata ?? null
+      if (typeof metadata === "string") {
+        try {
+          metadata = JSON.parse(metadata)
+        } catch {
+          // keep as-is
+        }
+      }
+
+      const mediaId = metadata?.media_id
+      const filename = metadata?.filename
+
+      let media_url: string | null = null
+      if (mediaId) {
+        media_url = `/api/whatsapp/media/${encodeURIComponent(String(mediaId))}`
+        if (filename) {
+          media_url += `?filename=${encodeURIComponent(String(filename))}`
+        }
+      }
+
+      return {
+        ...m,
+        metadata,
+        media_url,
+      }
+    })
 
     // Mark messages as read - silently ignore if it fails
     try {
@@ -93,7 +125,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       console.error("[GET messages] Error marking as read:", error)
     }
 
-    return NextResponse.json({ messages })
+    return NextResponse.json({ messages: normalizedMessages })
   } catch (error) {
     console.error("[GET messages] Error:", error)
     return NextResponse.json({ error: "Internal server error", details: String(error) }, { status: 500 })
