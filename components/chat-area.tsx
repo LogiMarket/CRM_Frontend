@@ -12,6 +12,7 @@ import { Send, MoreVertical, Phone, Video, Edit2, Trash2, Paperclip } from "luci
 import { cn } from "@/lib/utils"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { toast } from "@/hooks/use-toast"
 import { MacrosDialog } from "./macros-dialog"
 import { AssignAgentDialog } from "./assign-agent-dialog"
 import { ScheduleCallDialog } from "./schedule-call-dialog"
@@ -138,6 +139,21 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
         const data = await response.json().catch(() => null)
         if (!response.ok) {
           console.error("[ChatArea] Send media error:", response.status, data)
+
+          const detailsMessage =
+            data?.error ||
+            data?.details?.error?.message ||
+            data?.details?.message ||
+            (typeof data?.details === "string" ? data.details : null) ||
+            response.statusText ||
+            "No se pudo enviar el adjunto."
+
+          toast({
+            title: "Error al enviar adjunto",
+            description: String(detailsMessage),
+            variant: "destructive",
+          })
+
           // Restore pending state for retry
           setPendingFile(fileToSend)
           if (previewToRevoke) setPendingPreviewUrl(previewToRevoke)
@@ -165,6 +181,13 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
         }
       } catch (error) {
         console.error("[ChatArea] Send media error:", error)
+
+        toast({
+          title: "Error al enviar adjunto",
+          description: "Ocurrió un error inesperado al enviar el archivo.",
+          variant: "destructive",
+        })
+
         // Restore pending state for retry
         setPendingFile(fileToSend)
         if (previewToRevoke) setPendingPreviewUrl(previewToRevoke)
@@ -198,6 +221,11 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
 
         if (!response.ok) {
           console.error("[ChatArea] Facebook send error:", response.status, response.statusText)
+          toast({
+            title: "Error al enviar mensaje",
+            description: "No se pudo enviar el mensaje por Facebook.",
+            variant: "destructive",
+          })
           setNewMessage(messageContent)
           return
         }
@@ -224,6 +252,11 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
 
         if (!response.ok) {
           console.error("[ChatArea] Send message error:", response.status, response.statusText)
+          toast({
+            title: "Error al enviar mensaje",
+            description: "No se pudo enviar el mensaje.",
+            variant: "destructive",
+          })
           setNewMessage(messageContent)
           return
         }
@@ -244,6 +277,11 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
       }
     } catch (error) {
       console.error("[ChatArea] Send message error:", error)
+      toast({
+        title: "Error al enviar mensaje",
+        description: "Ocurrió un error inesperado.",
+        variant: "destructive",
+      })
       setNewMessage(messageContent)
     } finally {
       setSending(false)
