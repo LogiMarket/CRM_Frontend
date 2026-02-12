@@ -134,13 +134,13 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
     <div className="h-full flex flex-col bg-transparent">
       <ScrollArea className="flex-1">
         {/* Extra right padding prevents Radix scrollbar from covering text */}
-        <div className="space-y-4 p-4 pr-12">
+        <div className="space-y-4 p-4 pr-6">
         {conversations.map((conv) => (
           <div
             key={conv.id}
             onClick={() => onSelectConversation(conv.id)}
             className={cn(
-              "relative w-full rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
+              "relative w-full mr-4 rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
               selectedId === conv.id
                 ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-primary/25 ring-offset-2 ring-offset-muted/40 shadow-md"
                 : "border-border/70 hover:border-border hover:shadow-md",
