@@ -2,6 +2,25 @@ import { NextResponse } from "next/server"
 import { sql } from "@/lib/db"
 import { getSession } from "@/lib/session"
 
+let _hasConversationCommentsColumn: boolean | null = null
+
+async function hasConversationCommentsColumn(): Promise<boolean> {
+  if (_hasConversationCommentsColumn !== null) return _hasConversationCommentsColumn
+  try {
+    const rows = await sql!`
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'conversations'
+        AND column_name = 'comments'
+      LIMIT 1
+    `
+    _hasConversationCommentsColumn = Array.isArray(rows) && rows.length > 0
+  } catch {
+    _hasConversationCommentsColumn = false
+  }
+  return _hasConversationCommentsColumn
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -18,33 +37,25 @@ export async function GET(
       return NextResponse.json({ error: "Conversation ID required" }, { status: 400 })
     }
 
-    // Try UUID format first, then integer
-    let result: any
-    try {
-      result = await sql!`
-        SELECT 
-          id, 
-          status, 
-          priority, 
-          contact_id,
-          assigned_agent_id,
-          comments,
-          created_at, 
-          last_message_at
-        FROM conversations 
-        WHERE id::text = ${id}
-        LIMIT 1
-      `
-    } catch (e: any) {
-      const message = String(e?.message || "")
-      const code = String(e?.code || "")
-      const missingComments =
-        message.includes("comments") ||
-        message.includes("column \"comments\"") ||
-        message.includes("column comments")
+    const includeComments = await hasConversationCommentsColumn()
 
-      if ((code === "42703" || !code) && missingComments) {
-        result = await sql!`
+    // Try UUID format first, then integer
+    let result: any = includeComments
+      ? await sql!`
+          SELECT 
+            id, 
+            status, 
+            priority, 
+            contact_id,
+            assigned_agent_id,
+            comments,
+            created_at, 
+            last_message_at
+          FROM conversations 
+          WHERE id::text = ${id}
+          LIMIT 1
+        `
+      : await sql!`
           SELECT 
             id, 
             status, 
@@ -57,37 +68,24 @@ export async function GET(
           WHERE id::text = ${id}
           LIMIT 1
         `
-      } else {
-        throw e
-      }
-    }
 
     if (result.length === 0 && !isNaN(Number(id))) {
-      try {
-        result = await sql!`
-          SELECT 
-            id, 
-            status, 
-            priority, 
-            contact_id,
-            assigned_agent_id,
-            comments,
-            created_at, 
-            last_message_at
-          FROM conversations 
-          WHERE id = ${Number.parseInt(id)}
-          LIMIT 1
-        `
-      } catch (e: any) {
-        const message = String(e?.message || "")
-        const code = String(e?.code || "")
-        const missingComments =
-          message.includes("comments") ||
-          message.includes("column \"comments\"") ||
-          message.includes("column comments")
-
-        if ((code === "42703" || !code) && missingComments) {
-          result = await sql!`
+      result = includeComments
+        ? await sql!`
+            SELECT 
+              id, 
+              status, 
+              priority, 
+              contact_id,
+              assigned_agent_id,
+              comments,
+              created_at, 
+              last_message_at
+            FROM conversations 
+            WHERE id = ${Number.parseInt(id)}
+            LIMIT 1
+          `
+        : await sql!`
             SELECT 
               id, 
               status, 
@@ -100,10 +98,6 @@ export async function GET(
             WHERE id = ${Number.parseInt(id)}
             LIMIT 1
           `
-        } else {
-          throw e
-        }
-      }
     }
 
     if (result.length === 0) {
