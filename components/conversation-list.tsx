@@ -133,16 +133,17 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
   return (
     <div className="h-full flex flex-col bg-transparent">
       <ScrollArea className="flex-1">
-        <div className="space-y-4 p-4">
+        {/* Extra right padding prevents Radix scrollbar from covering text */}
+        <div className="space-y-4 p-4 pr-6">
         {conversations.map((conv) => (
           <div
             key={conv.id}
             onClick={() => onSelectConversation(conv.id)}
             className={cn(
-              "relative w-full rounded-xl border bg-background p-4 text-left shadow-sm transition-all duration-150 cursor-pointer",
+              "relative w-full rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
               selectedId === conv.id
-                ? "border-primary/60 bg-primary/10 ring-2 ring-primary/25 shadow-md"
-                : "border-border/70 hover:border-border hover:shadow-md hover:-translate-y-px",
+                ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-primary/25 shadow-md"
+                : "border-border/70 hover:border-border hover:shadow-md",
             )}
           >
             <div className="flex items-start gap-3">
@@ -161,9 +162,9 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
                 </div>
               </div>
               <div className="min-w-0 flex-1">
-                <div className="flex items-center justify-between gap-2 mb-1">
-                  <h3 className="truncate font-bold text-sm text-foreground">{conv.contact_name}</h3>
-                  <span className="flex-shrink-0 text-muted-foreground text-xs font-medium">
+                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 mb-1">
+                  <h3 className="min-w-0 truncate font-bold text-sm text-foreground">{conv.contact_name}</h3>
+                  <span className="max-w-[7.5rem] truncate text-right text-muted-foreground text-xs font-medium">
                     {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: es })}
                   </span>
                 </div>
