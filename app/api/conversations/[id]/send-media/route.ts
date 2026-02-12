@@ -99,28 +99,77 @@ export async function POST(
         }
         recipientDigits = normalizeToDigits(conv[0].external_user_id || conv[0].phone_number || "")
       }
-    } catch (e) {
-      // fallback to CAST if id is integer
-      const conv = await sql!`
-        SELECT
-          conv.channel,
-          conv.external_user_id,
-          c.phone_number
-        FROM conversations conv
-        LEFT JOIN contacts c ON conv.contact_id = c.id
-        WHERE CAST(conv.id AS VARCHAR) = ${id}
-        LIMIT 1
-      `
+    } catch (e: any) {
+      const message = String(e?.message || "")
+      const code = String(e?.code || "")
 
-      if (conv?.[0]) {
-        const channel = String(conv[0].channel || "whatsapp")
-        if (channel !== "whatsapp") {
-          return NextResponse.json(
-            { error: `Unsupported channel for media send: ${channel}` },
-            { status: 400 },
-          )
+      const missingColumn =
+        message.includes("conv.channel") ||
+        message.includes("conv.external_user_id") ||
+        message.includes("column conv.channel") ||
+        message.includes("column conv.external_user_id")
+
+      // fallback to CAST if id is integer OR to schema without those columns
+      try {
+        if (missingColumn && (code === "42703" || !code)) {
+          const conv = await sql!`
+            SELECT
+              c.phone_number
+            FROM conversations conv
+            LEFT JOIN contacts c ON conv.contact_id = c.id
+            WHERE conv.id::text = ${id}
+            LIMIT 1
+          `
+          if (conv?.[0]) {
+            recipientDigits = normalizeToDigits(conv[0].phone_number || "")
+          }
+        } else {
+          const conv = await sql!`
+            SELECT
+              conv.channel,
+              conv.external_user_id,
+              c.phone_number
+            FROM conversations conv
+            LEFT JOIN contacts c ON conv.contact_id = c.id
+            WHERE CAST(conv.id AS VARCHAR) = ${id}
+            LIMIT 1
+          `
+
+          if (conv?.[0]) {
+            const channel = String(conv[0].channel || "whatsapp")
+            if (channel !== "whatsapp") {
+              return NextResponse.json(
+                { error: `Unsupported channel for media send: ${channel}` },
+                { status: 400 },
+              )
+            }
+            recipientDigits = normalizeToDigits(conv[0].external_user_id || conv[0].phone_number || "")
+          }
         }
-        recipientDigits = normalizeToDigits(conv[0].external_user_id || conv[0].phone_number || "")
+      } catch (e2: any) {
+        const message2 = String(e2?.message || "")
+        const code2 = String(e2?.code || "")
+        const missingColumn2 =
+          message2.includes("conv.channel") ||
+          message2.includes("conv.external_user_id") ||
+          message2.includes("column conv.channel") ||
+          message2.includes("column conv.external_user_id")
+
+        if (missingColumn2 && (code2 === "42703" || !code2)) {
+          const conv = await sql!`
+            SELECT
+              c.phone_number
+            FROM conversations conv
+            LEFT JOIN contacts c ON conv.contact_id = c.id
+            WHERE CAST(conv.id AS VARCHAR) = ${id}
+            LIMIT 1
+          `
+          if (conv?.[0]) {
+            recipientDigits = normalizeToDigits(conv[0].phone_number || "")
+          }
+        } else {
+          throw e2
+        }
       }
     }
 

@@ -48,11 +48,19 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [sendingMedia, setSendingMedia] = useState(false)
+  const [pendingFile, setPendingFile] = useState<File | null>(null)
+  const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null)
   const [editingMessageId, setEditingMessageId] = useState<number | string | null>(null)
   const [editingContent, setEditingContent] = useState("")
   const [scheduleCallOpen, setScheduleCallOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => {
+    return () => {
+      if (pendingPreviewUrl) URL.revokeObjectURL(pendingPreviewUrl)
+    }
+  }, [pendingPreviewUrl])
 
   useEffect(() => {
     if (conversationId) {
@@ -100,7 +108,75 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
 
   const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim() || !conversationId || sending || sendingMedia) return
+    if (!conversationId || sending || sendingMedia) return
+
+    const hasText = Boolean(newMessage.trim())
+    const hasFile = Boolean(pendingFile)
+    if (!hasText && !hasFile) return
+
+    // If there is a pending attachment, send media. Text becomes caption.
+    if (pendingFile) {
+      setSendingMedia(true)
+      const fileToSend = pendingFile
+      const previewToRevoke = pendingPreviewUrl
+      const caption = newMessage.trim()
+
+      try {
+        const form = new FormData()
+        form.append("file", fileToSend)
+        if (caption) form.append("caption", caption)
+
+        setPendingFile(null)
+        setPendingPreviewUrl(null)
+        setNewMessage("")
+
+        const response = await fetch(`/api/conversations/${conversationId}/send-media`, {
+          method: "POST",
+          body: form,
+        })
+
+        const data = await response.json().catch(() => null)
+        if (!response.ok) {
+          console.error("[ChatArea] Send media error:", response.status, data)
+          // Restore pending state for retry
+          setPendingFile(fileToSend)
+          if (previewToRevoke) setPendingPreviewUrl(previewToRevoke)
+          setNewMessage(caption)
+          return
+        }
+
+        if (data?.message) {
+          const msg = data.message
+          setMessages([
+            ...messages,
+            {
+              id: msg.id,
+              content: msg.content,
+              sender_type: msg.sender_type || "agent",
+              sender_name: msg.sender_name || "Agent",
+              created_at: msg.created_at || new Date().toISOString(),
+              message_type: msg.message_type,
+              metadata: msg.metadata,
+              media_url: msg.media_url,
+            },
+          ])
+        } else {
+          await fetchMessages()
+        }
+      } catch (error) {
+        console.error("[ChatArea] Send media error:", error)
+        // Restore pending state for retry
+        setPendingFile(fileToSend)
+        if (previewToRevoke) setPendingPreviewUrl(previewToRevoke)
+        setNewMessage(caption)
+      } finally {
+        if (previewToRevoke) {
+          try { URL.revokeObjectURL(previewToRevoke) } catch {}
+        }
+        setSendingMedia(false)
+      }
+      return
+    }
 
     const messageContent = newMessage
     setSending(true)
@@ -186,49 +262,24 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
     // allow selecting the same file again later
     e.target.value = ""
 
-    setSendingMedia(true)
-    const caption = newMessage.trim()
-    setNewMessage("")
-
-    try {
-      const form = new FormData()
-      form.append("file", file)
-      if (caption) form.append("caption", caption)
-
-      const response = await fetch(`/api/conversations/${conversationId}/send-media`, {
-        method: "POST",
-        body: form,
-      })
-
-      const data = await response.json().catch(() => null)
-      if (!response.ok) {
-        console.error("[ChatArea] Send media error:", response.status, data)
-        return
-      }
-
-      if (data?.message) {
-        const msg = data.message
-        setMessages([
-          ...messages,
-          {
-            id: msg.id,
-            content: msg.content,
-            sender_type: msg.sender_type || "agent",
-            sender_name: msg.sender_name || "Agent",
-            created_at: msg.created_at || new Date().toISOString(),
-            message_type: msg.message_type,
-            metadata: msg.metadata,
-            media_url: msg.media_url,
-          },
-        ])
-      } else {
-        await fetchMessages()
-      }
-    } catch (error) {
-      console.error("[ChatArea] Send media error:", error)
-    } finally {
-      setSendingMedia(false)
+    // Replace previous pending attachment
+    if (pendingPreviewUrl) {
+      try { URL.revokeObjectURL(pendingPreviewUrl) } catch {}
     }
+
+    setPendingFile(file)
+    // Only generate preview for media types the browser can display
+    const mime = String(file.type || "").toLowerCase()
+    const canPreview = mime.startsWith("image/") || mime.startsWith("video/") || mime.startsWith("audio/")
+    setPendingPreviewUrl(canPreview ? URL.createObjectURL(file) : null)
+  }
+
+  const clearPendingAttachment = () => {
+    setPendingFile(null)
+    if (pendingPreviewUrl) {
+      try { URL.revokeObjectURL(pendingPreviewUrl) } catch {}
+    }
+    setPendingPreviewUrl(null)
   }
 
   const handleMacroSelect = async (content: string, macroId: number) => {
@@ -577,6 +628,28 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
         <div className="mb-2 flex gap-2">
           <MacrosDialog onSelectMacro={handleMacroSelect} />
         </div>
+
+        {pendingFile && (
+          <div className="mb-2 flex items-center justify-between gap-2 rounded-md border border-border bg-background px-3 py-2">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-muted-foreground">Adjunto listo para enviar</p>
+              <p className="text-sm truncate">{pendingFile.name}</p>
+              {pendingPreviewUrl && String(pendingFile.type || "").toLowerCase().startsWith("image/") && (
+                <img src={pendingPreviewUrl} alt={pendingFile.name} className="mt-2 max-h-48 rounded-md border border-border" />
+              )}
+              {pendingPreviewUrl && String(pendingFile.type || "").toLowerCase().startsWith("video/") && (
+                <video src={pendingPreviewUrl} controls className="mt-2 max-h-48 rounded-md border border-border" />
+              )}
+              {pendingPreviewUrl && String(pendingFile.type || "").toLowerCase().startsWith("audio/") && (
+                <audio src={pendingPreviewUrl} controls className="mt-2 w-full" />
+              )}
+            </div>
+            <Button type="button" variant="ghost" onClick={clearPendingAttachment} disabled={sending || sendingMedia}>
+              Quitar
+            </Button>
+          </div>
+        )}
+
         <form onSubmit={handleSendMessage} className="flex gap-2">
           <input
             ref={fileInputRef}
@@ -597,13 +670,13 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
           <Input
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Escribe un mensaje..."
+            placeholder={pendingFile ? "Escribe una leyenda (opcional)..." : "Escribe un mensaje..."}
             disabled={sending || sendingMedia}
             className="flex-1 transition-all focus:ring-2 focus:ring-primary"
           />
           <Button
             type="submit"
-            disabled={sending || sendingMedia || !newMessage.trim()}
+            disabled={sending || sendingMedia || (!newMessage.trim() && !pendingFile)}
             className="transition-all hover:scale-105 active:scale-95"
           >
             <Send className="h-4 w-4" />
