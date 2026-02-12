@@ -3,7 +3,7 @@
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
-import { cn } from "@/lib/utils"
+import { cn, formatContactDisplayName, getContactAvatarText } from "@/lib/utils"
 import { formatDistanceToNow } from "date-fns"
 import { es } from "date-fns/locale"
 import { useConversations } from "@/hooks/use-conversations"
@@ -50,13 +50,8 @@ export function ConversationList({
     channel: conv.channel || "whatsapp",
   }))
 
-  const getInitials = (name: string) =>
-    name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2)
+  const getDisplayName = (name: string, channel?: string) =>
+    formatContactDisplayName(name, channel)
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -161,7 +156,7 @@ export function ConversationList({
                   <div className="relative flex-shrink-0">
                     <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
                       <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm">
-                        {getInitials(conv.contact_name)}
+                        {getContactAvatarText(getDisplayName(conv.contact_name, conv.channel), conv.channel)}
                       </AvatarFallback>
                     </Avatar>
 
@@ -178,7 +173,7 @@ export function ConversationList({
                   <div className="min-w-0 flex-1">
                     <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 mb-1">
                       <h3 className="min-w-0 truncate font-bold text-sm text-foreground">
-                        {conv.contact_name}
+                        {getDisplayName(conv.contact_name, conv.channel)}
                       </h3>
                       <span className="whitespace-nowrap text-right text-muted-foreground text-xs font-medium">
                         {formatDistanceToNow(new Date(conv.last_message_at), {

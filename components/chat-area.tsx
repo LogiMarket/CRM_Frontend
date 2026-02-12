@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Textarea } from "@/components/ui/textarea"
 import { Send, MoreVertical, Phone, Video, Edit2, Trash2, Paperclip } from "lucide-react"
-import { cn } from "@/lib/utils"
+import { cn, formatContactDisplayName, getContactAvatarText } from "@/lib/utils"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { toast } from "@/hooks/use-toast"
@@ -70,6 +70,8 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
   const [scheduleCallOpen, setScheduleCallOpen] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const displayContactName = formatContactDisplayName(resolvedContactName || contactName, channel)
 
   useEffect(() => {
     return () => {
@@ -575,12 +577,12 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 transition-transform duration-200 hover:scale-105">
             <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-              {resolvedContactName ? getInitials(resolvedContactName) : "?"}
+              {displayContactName ? getContactAvatarText(displayContactName, channel) : "?"}
             </AvatarFallback>
           </Avatar>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-sm text-foreground">{resolvedContactName || "Contacto"}</h2>
+              <h2 className="font-semibold text-sm text-foreground">{displayContactName || "Contacto"}</h2>
               {/* Channel badge */}
               {channel && (
                 <span className={cn(
