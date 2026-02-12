@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server"
-import { sql } from "@/lib/db"
+import { isDemoMode, sql } from "@/lib/db"
 import { getSession } from "@/lib/session"
 
 let _hasConversationCommentsColumn: boolean | null = null
@@ -181,6 +181,124 @@ export async function GET(
     })
   } catch (error) {
     console.error("[Conversations GET] Error:", error)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
+}
+
+function normalizeRole(role: string | undefined | null): "admin" | "supervisor" | "agent" | "other" {
+  const r = String(role || "").trim()
+  const roleMap: Record<string, "admin" | "supervisor" | "agent"> = {
+    Administrador: "admin",
+    Supervisor: "supervisor",
+    Agente: "agent",
+    admin: "admin",
+    supervisor: "supervisor",
+    agent: "agent",
+  }
+  return roleMap[r] || "other"
+}
+
+async function findConversationId(tx: typeof sql, id: string): Promise<{ id: any } | null> {
+  // Prefer text comparison for UUID/int compatibility
+  let rows: any[] = []
+  try {
+    rows = await tx`
+      SELECT id
+      FROM conversations
+      WHERE id::text = ${id}
+      LIMIT 1
+    `
+  } catch {
+    // ignore and fallback
+  }
+  if (rows?.length) return rows[0]
+
+  if (!isNaN(Number(id))) {
+    const intId = Number.parseInt(id)
+    rows = await tx`
+      SELECT id
+      FROM conversations
+      WHERE id = ${intId}
+      LIMIT 1
+    `
+    if (rows?.length) return rows[0]
+  }
+
+  return null
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const user = await getSession()
+    if (!user) {
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
+    }
+
+    const { id } = await params
+    if (!id) {
+      return NextResponse.json({ error: "Conversation ID required" }, { status: 400 })
+    }
+
+    const role = normalizeRole((user as any).role)
+    if (role !== "admin" && role !== "supervisor") {
+      return NextResponse.json({ error: "Access denied" }, { status: 403 })
+    }
+
+    if (isDemoMode) {
+      return NextResponse.json({ ok: true, deleted: id, demo: true })
+    }
+
+    const deletedId = await sql.begin(async (tx) => {
+      const conv = await findConversationId(tx as any, id)
+      if (!conv) {
+        return null
+      }
+
+      // Best-effort deletes for dependent tables (some deployments may not have all tables/columns)
+      const tryDelete = async (fn: () => Promise<any>) => {
+        try {
+          await fn()
+        } catch {
+          // ignore
+        }
+      }
+
+      await tryDelete(() => (tx as any)`DELETE FROM messages WHERE conversation_id::text = ${id}`)
+      await tryDelete(() => (tx as any)`DELETE FROM conversation_tags WHERE conversation_id::text = ${id}`)
+
+      // In case the schema doesn't allow ::text comparisons
+      if (!isNaN(Number(id))) {
+        const intId = Number.parseInt(id)
+        await tryDelete(() => (tx as any)`DELETE FROM messages WHERE conversation_id = ${intId}`)
+        await tryDelete(() => (tx as any)`DELETE FROM conversation_tags WHERE conversation_id = ${intId}`)
+      }
+
+      // Finally delete the conversation row
+      let delRows: any[] = []
+      try {
+        delRows = await (tx as any)`DELETE FROM conversations WHERE id::text = ${id} RETURNING id`
+      } catch {
+        if (!isNaN(Number(id))) {
+          const intId = Number.parseInt(id)
+          delRows = await (tx as any)`DELETE FROM conversations WHERE id = ${intId} RETURNING id`
+        } else {
+          throw new Error("Failed to delete conversation")
+        }
+      }
+
+      return delRows?.[0]?.id ?? null
+    })
+
+    if (!deletedId) {
+      return NextResponse.json({ error: "Conversation not found" }, { status: 404 })
+    }
+
+    return NextResponse.json({ ok: true, deleted: deletedId })
+  } catch (error) {
+    console.error("[Conversations DELETE] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

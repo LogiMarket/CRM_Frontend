@@ -105,6 +105,14 @@ export default function InboxPage() {
     setRefreshKey((prev) => prev + 1)
   }
 
+  const handleConversationDeleted = () => {
+    setSelectedConversationId(undefined)
+    setSelectedContactName(undefined)
+    setSelectedContactId(undefined)
+    setCurrentAgentId(undefined)
+    setConversationDetails(undefined)
+  }
+
   const handleAgentChange = (agentId: string, agentName: string) => {
     setCurrentAgentId(Number(agentId))
     if (conversationDetails) {
@@ -139,6 +147,7 @@ export default function InboxPage() {
             contactName={selectedContactName}
             currentAgentId={currentAgentId}
             onUpdate={handleUpdate}
+            onConversationDeleted={handleConversationDeleted}
           />
         </div>
 

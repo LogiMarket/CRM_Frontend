@@ -40,6 +40,15 @@ export default function ConversacionesPage() {
     setRefreshKey((prev) => prev + 1)
   }
 
+  const handleConversationDeleted = () => {
+    setSelectedConversationId(undefined)
+    setSelectedContactName(undefined)
+    setSelectedContactId(undefined)
+    setCurrentAgentId(undefined)
+    setSelectedChannel('whatsapp')
+    setSelectedExternalUserId(undefined)
+  }
+
   return (
     <>
       <InboxHeader />
@@ -64,6 +73,7 @@ export default function ConversacionesPage() {
             channel={selectedChannel}
             externalUserId={selectedExternalUserId}
             onUpdate={handleUpdate}
+            onConversationDeleted={handleConversationDeleted}
           />
         </div>
 

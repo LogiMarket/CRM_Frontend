@@ -17,6 +17,16 @@ import { MacrosDialog } from "./macros-dialog"
 import { AssignAgentDialog } from "./assign-agent-dialog"
 import { ScheduleCallDialog } from "./schedule-call-dialog"
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -41,14 +51,17 @@ interface ChatAreaProps {
   channel?: string // 'whatsapp', 'facebook', etc
   externalUserId?: string // PSID for Facebook, phone for WhatsApp
   onUpdate?: () => void
+  onConversationDeleted?: () => void
 }
 
-export function ChatArea({ conversationId, contactName, currentAgentId, channel = 'whatsapp', externalUserId, onUpdate }: ChatAreaProps) {
+export function ChatArea({ conversationId, contactName, currentAgentId, channel = 'whatsapp', externalUserId, onUpdate, onConversationDeleted }: ChatAreaProps) {
   const [messages, setMessages] = useState<Message[]>([])
   const [newMessage, setNewMessage] = useState("")
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [sendingMedia, setSendingMedia] = useState(false)
+  const [deleteConversationOpen, setDeleteConversationOpen] = useState(false)
+  const [deletingConversation, setDeletingConversation] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
   const [pendingPreviewUrl, setPendingPreviewUrl] = useState<string | null>(null)
   const [editingMessageId, setEditingMessageId] = useState<number | string | null>(null)
@@ -72,6 +85,45 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
       return () => clearInterval(intervalId)
     }
   }, [conversationId])
+
+  const handleDeleteConversation = async () => {
+    if (!conversationId) return
+
+    try {
+      setDeletingConversation(true)
+      const res = await fetch(`/api/conversations/${encodeURIComponent(String(conversationId))}`, {
+        method: "DELETE",
+      })
+
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const message = data?.error || "No se pudo eliminar la conversación"
+        toast({
+          title: "Error",
+          description: message,
+          variant: "destructive",
+        })
+        return
+      }
+
+      toast({
+        title: "Conversación eliminada",
+        description: "Se eliminó correctamente.",
+      })
+
+      setDeleteConversationOpen(false)
+      onConversationDeleted?.()
+      onUpdate?.()
+    } catch (err) {
+      toast({
+        title: "Error",
+        description: err instanceof Error ? err.message : "No se pudo eliminar la conversación",
+        variant: "destructive",
+      })
+    } finally {
+      setDeletingConversation(false)
+    }
+  }
 
   // Auto-scroll al bottom cuando hay nuevos mensajes
   useEffect(() => {
@@ -556,10 +608,41 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
               </DropdownMenuItem>
               <DropdownMenuItem>Enviar encuesta</DropdownMenuItem>
               <DropdownMenuItem>Transferir conversación</DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive focus:text-destructive"
+                onClick={() => setDeleteConversationOpen(true)}
+                disabled={!conversationId || deletingConversation}
+              >
+                Eliminar conversación
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
       </div>
+
+      <AlertDialog open={deleteConversationOpen} onOpenChange={setDeleteConversationOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Eliminar conversación?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción eliminará la conversación y sus mensajes. No se puede deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingConversation}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={(e) => {
+                e.preventDefault()
+                void handleDeleteConversation()
+              }}
+              disabled={deletingConversation}
+            >
+              {deletingConversation ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Schedule Call Dialog */}
       <ScheduleCallDialog
