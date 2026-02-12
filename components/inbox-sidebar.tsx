@@ -1,6 +1,6 @@
 "use client"
 
-import { MessageSquare, Users, Settings, LogOut, Menu, X, Calendar } from "lucide-react"
+import { MessageSquare, Users, Settings, LogOut, Menu, X, Calendar, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -48,6 +48,7 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
   }
 
   const isInbox = pathname === "/inbox"
+  const isContactos = pathname.startsWith("/inbox/contactos")
   const isCitas = pathname.startsWith("/inbox/citas")
   const isAgentes = pathname.startsWith("/inbox/agentes")
   const isConfiguracion = pathname.startsWith("/inbox/configuracion")
@@ -88,6 +89,21 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
         >
           <MessageSquare className="h-5 w-5" />
           {!collapsed && <span className="ml-3">Conversaciones</span>}
+        </Button>
+
+        <Button
+          variant="ghost"
+          onClick={() => router.push("/inbox/contactos")}
+          className={cn(
+            "w-full justify-start transition-colors",
+            collapsed && "justify-center px-2",
+            isContactos
+              ? "bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
+              : "text-foreground hover:bg-sidebar-accent hover:text-foreground",
+          )}
+        >
+          <User className="h-5 w-5" />
+          {!collapsed && <span className="ml-3">Contactos</span>}
         </Button>
         
         {/* Citas */}
