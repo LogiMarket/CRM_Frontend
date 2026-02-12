@@ -1,6 +1,6 @@
 "use client"
 
-import { MessageSquare, Users, Settings, LogOut, Menu, X, Calendar, User } from "lucide-react"
+import { MessageSquare, Users, Settings, LogOut, Menu, X, Calendar, User, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Separator } from "@/components/ui/separator"
@@ -49,6 +49,7 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
 
   const isInbox = pathname === "/inbox"
   const isContactos = pathname.startsWith("/inbox/contactos")
+  const isEnvios = pathname.startsWith("/inbox/envios")
   const isCitas = pathname.startsWith("/inbox/citas")
   const isAgentes = pathname.startsWith("/inbox/agentes")
   const isConfiguracion = pathname.startsWith("/inbox/configuracion")
@@ -105,6 +106,24 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
           <User className="h-5 w-5" />
           {!collapsed && <span className="ml-3">Contactos</span>}
         </Button>
+
+        {/* Envíos masivos - solo visible para admin y supervisor */}
+        {isAdminOrSupervisor && (
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/inbox/envios")}
+            className={cn(
+              "w-full justify-start transition-colors",
+              collapsed && "justify-center px-2",
+              isEnvios
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
+                : "text-foreground hover:bg-sidebar-accent hover:text-foreground",
+            )}
+          >
+            <Send className="h-5 w-5" />
+            {!collapsed && <span className="ml-3">Envíos masivos</span>}
+          </Button>
+        )}
         
         {/* Citas */}
         <Button
