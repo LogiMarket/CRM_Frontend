@@ -19,7 +19,7 @@ interface Conversation {
   status: string
   priority: string
   agent_name?: string
-  channel?: string // whatsapp, facebook, etc
+  channel?: string
 }
 
 interface ConversationListProps {
@@ -28,11 +28,15 @@ interface ConversationListProps {
   onlyAssigned?: boolean
 }
 
-export function ConversationList({ selectedId, onSelectConversation, onlyAssigned }: ConversationListProps) {
-  const { conversations: backendConversations, loading, refreshing, error } = useConversations(onlyAssigned)
-  
-  // Transform backend data to component format
-  const conversations = backendConversations.map(conv => ({
+export function ConversationList({
+  selectedId,
+  onSelectConversation,
+  onlyAssigned,
+}: ConversationListProps) {
+  const { conversations: backendConversations, loading, error } =
+    useConversations(onlyAssigned)
+
+  const conversations: Conversation[] = backendConversations.map((conv) => ({
     id: String(conv.id),
     contact_name: conv.customer_name,
     phone_number: conv.customer_phone,
@@ -42,18 +46,17 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
     unread_count: conv.unread_count,
     status: conv.status,
     priority: conv.priority,
-    agent_name: undefined, // TODO: fetch from assigned_agent_id
-    channel: conv.channel || 'whatsapp',
+    agent_name: undefined,
+    channel: conv.channel || "whatsapp",
   }))
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) =>
+    name
       .split(" ")
       .map((n) => n[0])
       .join("")
       .toUpperCase()
       .slice(0, 2)
-  }
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -72,132 +75,153 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
 
   const getPriorityLabel = (priority: string) => {
     const labels: Record<string, string> = {
-      "high": "Alta",
-      "medium": "Media",
-      "normal": "Normal",
-      "low": "Baja",
+      high: "Alta",
+      medium: "Media",
+      normal: "Normal",
+      low: "Baja",
     }
     return labels[priority] || priority
   }
 
   const getChannelIcon = (channel?: string) => {
     switch (channel) {
-      case 'facebook':
-        return '💬' // Facebook Messenger
-      case 'whatsapp':
-        return '💚' // WhatsApp
-      case 'instagram':
-        return '📷' // Instagram
+      case "facebook":
+        return "💬"
+      case "whatsapp":
+        return "💚"
+      case "instagram":
+        return "📷"
       default:
-        return '💬' // Default
+        return "💬"
     }
   }
 
   const getChannelColor = (channel?: string) => {
     switch (channel) {
-      case 'facebook':
-        return 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300'
-      case 'whatsapp':
-        return 'bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300'
-      case 'instagram':
-        return 'bg-pink-100 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300'
+      case "facebook":
+        return "bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300"
+      case "whatsapp":
+        return "bg-green-100 text-green-700 dark:bg-green-950/50 dark:text-green-300"
+      case "instagram":
+        return "bg-pink-100 text-pink-700 dark:bg-pink-950/50 dark:text-pink-300"
       default:
-        return 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300'
+        return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300"
     }
   }
 
   if (loading) {
     return (
-      <div className="flex h-full items-center justify-center">
-        <p className="text-muted-foreground text-sm">Cargando conversaciones...</p>
+      <div className="h-full p-3">
+        <div className="h-full rounded-xl border bg-card shadow-sm flex items-center justify-center">
+          <p className="text-muted-foreground text-sm">Cargando conversaciones...</p>
+        </div>
       </div>
     )
   }
 
   if (error) {
     return (
-      <div className="flex h-full items-center justify-center p-4">
-        <p className="text-red-500 text-sm text-center">{error}</p>
+      <div className="h-full p-3">
+        <div className="h-full rounded-xl border bg-card shadow-sm flex items-center justify-center p-4">
+          <p className="text-red-500 text-sm text-center">{error}</p>
+        </div>
       </div>
     )
   }
 
   if (conversations.length === 0) {
     return (
-      <div className="flex h-full items-center justify-center p-4">
-        <p className="text-muted-foreground text-sm text-center">No hay conversaciones</p>
+      <div className="h-full p-3">
+        <div className="h-full rounded-xl border bg-card shadow-sm flex items-center justify-center p-4">
+          <p className="text-muted-foreground text-sm text-center">No hay conversaciones</p>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="h-full flex flex-col bg-transparent">
-      <ScrollArea className="flex-1">
-        {/* Match reference UI: compact cards with consistent inner margin */}
-        <div className="space-y-3 px-4 py-4 pr-10">
-        {conversations.map((conv) => (
-          <div
-            key={conv.id}
-            onClick={() => onSelectConversation(conv.id)}
-            className={cn(
-              "relative box-border w-full rounded-lg border bg-background p-3 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
-              selectedId === conv.id
-                ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-inset ring-primary/25 shadow-md"
-                : "border-border/70 hover:border-border hover:shadow-md",
-            )}
-          >
-            <div className="flex items-start gap-3">
-              <div className="relative flex-shrink-0">
-                <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
-                  <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm">
-                    {getInitials(conv.contact_name)}
-                  </AvatarFallback>
-                </Avatar>
-                {/* Channel badge */}
-                <div className={cn(
-                  "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center text-xs shadow-md ring-2 ring-background",
-                  getChannelColor(conv.channel)
-                )}>
-                  {getChannelIcon(conv.channel)}
+    // 🔥 ESTE WRAPPER ES LA CLAVE: crea el “recuadro” del sidebar y separa del chat
+    <div className="h-full p-3 pr-4">
+      <div className="h-full rounded-xl border bg-card shadow-sm overflow-hidden">
+        <ScrollArea className="h-full">
+          {/* padding interno del panel */}
+          <div className="space-y-3 p-3">
+            {conversations.map((conv) => (
+              <div
+                key={conv.id}
+                onClick={() => onSelectConversation(conv.id)}
+                className={cn(
+                  "relative w-full rounded-lg border bg-background p-3 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
+                  selectedId === conv.id
+                    ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-inset ring-primary/25 shadow-md"
+                    : "border-border/70 hover:border-border hover:shadow-md",
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <div className="relative flex-shrink-0">
+                    <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
+                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm">
+                        {getInitials(conv.contact_name)}
+                      </AvatarFallback>
+                    </Avatar>
+
+                    <div
+                      className={cn(
+                        "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center text-xs shadow-md ring-2 ring-background",
+                        getChannelColor(conv.channel),
+                      )}
+                    >
+                      {getChannelIcon(conv.channel)}
+                    </div>
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 mb-1">
+                      <h3 className="min-w-0 truncate font-bold text-sm text-foreground">
+                        {conv.contact_name}
+                      </h3>
+                      <span className="whitespace-nowrap text-right text-muted-foreground text-xs font-medium">
+                        {formatDistanceToNow(new Date(conv.last_message_at), {
+                          addSuffix: true,
+                          locale: es,
+                        })}
+                      </span>
+                    </div>
+
+                    <p className="line-clamp-1 text-muted-foreground text-xs leading-relaxed mb-2">
+                      {conv.last_message || "Sin mensajes"}
+                    </p>
+
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {conv.unread_count > 0 && (
+                        <Badge variant="default" className="h-5 rounded-full px-2 text-xs font-bold shadow-sm">
+                          {conv.unread_count}
+                        </Badge>
+                      )}
+
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "h-5 rounded-full px-2 text-xs font-semibold border-2",
+                          getPriorityColor(conv.priority),
+                        )}
+                      >
+                        {getPriorityLabel(conv.priority)}
+                      </Badge>
+
+                      {conv.agent_name && (
+                        <span className="truncate text-foreground text-xs font-medium bg-muted px-2 py-0.5 rounded-full">
+                          👤 {conv.agent_name}
+                        </span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 mb-1">
-                  <h3 className="min-w-0 truncate font-bold text-sm text-foreground">{conv.contact_name}</h3>
-                  <span className="whitespace-nowrap text-right text-muted-foreground text-xs font-medium">
-                    {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: es })}
-                  </span>
-                </div>
-                <p className="line-clamp-1 text-muted-foreground text-xs leading-relaxed mb-2">
-                  {conv.last_message || "Sin mensajes"}
-                </p>
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  {conv.unread_count > 0 && (
-                    <Badge variant="default" className="h-5 rounded-full px-2 text-xs font-bold shadow-sm">
-                      {conv.unread_count}
-                    </Badge>
-                  )}
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      "h-5 rounded-full px-2 text-xs font-semibold border-2",
-                      getPriorityColor(conv.priority),
-                    )}
-                  >
-                    {getPriorityLabel(conv.priority)}
-                  </Badge>
-                  {conv.agent_name && (
-                    <span className="truncate text-foreground text-xs font-medium bg-muted px-2 py-0.5 rounded-full">
-                      👤 {conv.agent_name}
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
+            ))}
           </div>
-        ))}
+        </ScrollArea>
       </div>
-      </ScrollArea>
     </div>
   )
 }
