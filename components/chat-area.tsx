@@ -394,7 +394,11 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
     const textToShow = caption || (!isPlaceholderContent(msg.content) ? String(msg.content || "").trim() : "")
 
     if (!mediaUrl || type === "text") {
-      return <p className="text-sm leading-relaxed">{msg.content}</p>
+      return (
+        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+          {msg.content}
+        </p>
+      )
     }
 
     if (type === "image" || type === "sticker") {
@@ -406,7 +410,11 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
             className="max-w-full rounded-md border border-border"
             loading="lazy"
           />
-          {textToShow && <p className="text-sm leading-relaxed">{textToShow}</p>}
+          {textToShow && (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+              {textToShow}
+            </p>
+          )}
         </div>
       )
     }
@@ -419,7 +427,11 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
             controls
             className="max-w-full rounded-md border border-border"
           />
-          {textToShow && <p className="text-sm leading-relaxed">{textToShow}</p>}
+          {textToShow && (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+              {textToShow}
+            </p>
+          )}
         </div>
       )
     }
@@ -428,7 +440,11 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
       return (
         <div className="space-y-2">
           <audio src={mediaUrl} controls className="w-full" />
-          {textToShow && <p className="text-sm leading-relaxed">{textToShow}</p>}
+          {textToShow && (
+            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+              {textToShow}
+            </p>
+          )}
         </div>
       )
     }
@@ -440,11 +456,15 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
           href={mediaUrl}
           target="_blank"
           rel="noreferrer"
-          className="underline underline-offset-2 text-sm break-all"
+          className="underline underline-offset-2 text-sm break-words [overflow-wrap:anywhere]"
         >
           {filename || msg.content || "Ver archivo"}
         </a>
-        {caption && <p className="text-sm leading-relaxed">{caption}</p>}
+        {caption && (
+          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
+            {caption}
+          </p>
+        )}
       </div>
     )
   }
@@ -584,7 +604,12 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
                       {getInitials(msg.sender_name)}
                     </AvatarFallback>
                   </Avatar>
-                  <div className={cn("max-w-[70%] space-y-1", msg.sender_type === "agent" && "items-end")}>
+                  <div
+                    className={cn(
+                      "max-w-[70%] min-w-0 space-y-1 flex flex-col",
+                      msg.sender_type === "agent" && "items-end",
+                    )}
+                  >
                     {editingMessageId === msg.id ? (
                       <div className="space-y-2">
                         <Textarea
@@ -618,7 +643,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
                       <>
                         <div
                           className={cn(
-                            "rounded-lg px-4 py-2 shadow-sm transition-all hover:shadow-md group-hover:ring-2",
+                            "max-w-full rounded-lg px-4 py-2 shadow-sm transition-all hover:shadow-md group-hover:ring-2",
                             msg.sender_type === "agent"
                               ? "bg-primary text-primary-foreground group-hover:ring-primary/50"
                               : "bg-card text-foreground border border-border group-hover:ring-muted-foreground/30",
