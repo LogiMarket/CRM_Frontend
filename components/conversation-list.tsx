@@ -134,20 +134,19 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
     <div className="h-full flex flex-col bg-transparent">
       <ScrollArea className="flex-1">
         {/* Extra right padding prevents Radix scrollbar from covering text */}
-        <div className="space-y-4 p-4 pr-6">
+        <div className="space-y-4 p-4 pr-4">
         {conversations.map((conv) => (
-          // Wrapper creates a guaranteed right gutter before the chat divider
-          <div key={conv.id} className="pr-6">
-            <div
-              onClick={() => onSelectConversation(conv.id)}
-              className={cn(
-                "relative w-full rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
-                selectedId === conv.id
-                  ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-primary/25 ring-offset-2 ring-offset-muted/40 shadow-md"
-                  : "border-border/70 hover:border-border hover:shadow-md",
-              )}
-            >
-              <div className="flex items-start gap-3">
+          <div
+            key={conv.id}
+            onClick={() => onSelectConversation(conv.id)}
+            className={cn(
+              "relative w-full rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
+              selectedId === conv.id
+                ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-inset ring-primary/25 shadow-md"
+                : "border-border/70 hover:border-border hover:shadow-md",
+            )}
+          >
+            <div className="flex items-start gap-3">
               <div className="relative flex-shrink-0">
                 <Avatar className="h-11 w-11 ring-2 ring-background shadow-sm">
                   <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-bold text-sm">
@@ -165,7 +164,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
               <div className="min-w-0 flex-1">
                 <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 mb-1">
                   <h3 className="min-w-0 truncate font-bold text-sm text-foreground">{conv.contact_name}</h3>
-                  <span className="max-w-[7.5rem] truncate text-right text-muted-foreground text-xs font-medium">
+                  <span className="whitespace-nowrap text-right text-muted-foreground text-xs font-medium">
                     {formatDistanceToNow(new Date(conv.last_message_at), { addSuffix: true, locale: es })}
                   </span>
                 </div>
@@ -194,7 +193,6 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
                   )}
                 </div>
               </div>
-            </div>
             </div>
           </div>
         ))}
