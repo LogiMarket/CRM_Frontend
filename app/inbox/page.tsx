@@ -6,11 +6,25 @@ import { ConversationList } from "@/components/conversation-list"
 import { ChatArea } from "@/components/chat-area"
 import { OrdersPanel } from "@/components/orders-panel"
 
+interface ConversationData {
+  id: string
+  status: string
+  priority: string
+  agent_name?: string
+  created_at: string
+  last_message_at: string
+  contact_name: string
+  phone_number: string
+  contact_id: number
+  assigned_agent_id?: number
+}
+
 export default function InboxPage() {
-  const [selectedConversationId, setSelectedConversationId] = useState<number>()
+  const [selectedConversationId, setSelectedConversationId] = useState<string>()
   const [selectedContactName, setSelectedContactName] = useState<string>()
   const [selectedContactId, setSelectedContactId] = useState<number>()
   const [currentAgentId, setCurrentAgentId] = useState<number>()
+  const [conversationDetails, setConversationDetails] = useState<ConversationData>()
   const [refreshKey, setRefreshKey] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
   const [showOrdersPanel, setShowOrdersPanel] = useState(true)
@@ -36,10 +50,22 @@ export default function InboxPage() {
         const data = await res.json()
         const first = data.conversations?.[0]
         if (first) {
-          setSelectedConversationId(Number(first.id))
+          setSelectedConversationId(String(first.id))
           setSelectedContactName(first.contact_name)
           setSelectedContactId(first.contact_id)
           setCurrentAgentId(first.assigned_agent_id)
+          setConversationDetails({
+            id: String(first.id),
+            status: first.status,
+            priority: first.priority,
+            agent_name: first.agent_name,
+            created_at: first.created_at,
+            last_message_at: first.last_message_at,
+            contact_name: first.contact_name,
+            phone_number: first.phone_number,
+            contact_id: first.contact_id,
+            assigned_agent_id: first.assigned_agent_id,
+          })
         }
       } catch (error) {
         console.error("[inbox] Error auto-select:", error)
@@ -49,22 +75,45 @@ export default function InboxPage() {
     pickFirstConversation()
   }, [selectedConversationId, refreshKey])
 
-  const handleSelectConversation = (id: number) => {
+  const handleSelectConversation = (id: string) => {
     setSelectedConversationId(id)
     fetch("/api/conversations")
       .then((res) => res.json())
       .then((data) => {
-        const conv = (data.conversations || []).find((c: any) => Number(c.id) === id)
+        const conv = data.conversations.find((c: any) => c.id === id || c.id === Number(id))
         if (conv) {
           setSelectedContactName(conv.contact_name)
           setSelectedContactId(conv.contact_id)
           setCurrentAgentId(conv.assigned_agent_id)
+          setConversationDetails({
+            id: String(conv.id),
+            status: conv.status,
+            priority: conv.priority,
+            agent_name: conv.agent_name,
+            created_at: conv.created_at,
+            last_message_at: conv.last_message_at,
+            contact_name: conv.contact_name,
+            phone_number: conv.phone_number,
+            contact_id: conv.contact_id,
+            assigned_agent_id: conv.assigned_agent_id,
+          })
         }
       })
   }
 
   const handleUpdate = () => {
     setRefreshKey((prev) => prev + 1)
+  }
+
+  const handleAgentChange = (agentId: string, agentName: string) => {
+    setCurrentAgentId(Number(agentId))
+    if (conversationDetails) {
+      setConversationDetails({
+        ...conversationDetails,
+        agent_name: agentName,
+        assigned_agent_id: Number(agentId),
+      })
+    }
   }
 
   return (
@@ -93,7 +142,11 @@ export default function InboxPage() {
         {/* Orders/Details panel - responsive */}
         {showOrdersPanel && (
           <div className="hidden xl:flex h-full w-full xl:w-96 2xl:w-[28rem] flex-col border-l border-border bg-card flex-shrink-0 overflow-hidden">
-              <OrdersPanel conversationId={selectedConversationId} onUpdate={handleUpdate} />
+              <OrdersPanel 
+                conversationDetails={conversationDetails}
+                onUpdate={handleUpdate}
+                onAgentChange={handleAgentChange}
+              />
           </div>
         )}
       </div>

@@ -1,60 +1,35 @@
 "use client"
 
 import { ConversationDetails } from "@/components/conversation-details"
-import { useEffect, useState } from "react"
+import { useState } from "react"
 
 interface OrdersPanelProps {
-  conversationId?: number
+  conversationDetails?: any
   onUpdate?: () => void
+  onAgentChange?: (agentId: string, agentName: string) => void
 }
 
-export function OrdersPanel({ conversationId, onUpdate }: OrdersPanelProps) {
-  const [details, setDetails] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+export function OrdersPanel({ conversationDetails, onUpdate, onAgentChange }: OrdersPanelProps) {
+  const [currentAgentName, setCurrentAgentName] = useState(conversationDetails?.agent_name)
 
-  useEffect(() => {
-    if (!conversationId) {
-      setDetails(null)
-      return
-    }
-
-    let cancelled = false
-    const load = async () => {
-      setLoading(true)
-      try {
-        const res = await fetch(`/api/conversations/${conversationId}`)
-        if (!res.ok) return
-        const data = await res.json()
-        if (!cancelled) setDetails(data)
-      } catch {
-        // best-effort panel
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-
-    load()
-    return () => {
-      cancelled = true
-    }
-  }, [conversationId])
+  const handleAgentChange = (agentId: string, agentName: string) => {
+    setCurrentAgentName(agentName)
+    onAgentChange?.(agentId, agentName)
+  }
 
   return (
-    <div className="h-full">
-      {loading && (
-        <div className="p-4 text-sm text-muted-foreground">Cargando detalles…</div>
-      )}
-      <ConversationDetails
-        conversationId={conversationId}
-        contactName={details?.contact_name ?? details?.contact?.name}
-        contactPhone={details?.phone_number ?? details?.contact?.phone_number}
-        status={details?.status}
-        priority={details?.priority}
-        agentName={details?.agent_name ?? details?.assigned_agent?.name}
-        lastActivity={details?.last_message_at}
-        onUpdate={onUpdate}
-      />
-    </div>
+    <ConversationDetails
+      conversationId={conversationDetails?.id}
+      status={conversationDetails?.status}
+      priority={conversationDetails?.priority}
+      agent_name={conversationDetails?.agent_name || currentAgentName}
+      created_at={conversationDetails?.created_at}
+      last_message_at={conversationDetails?.last_message_at}
+      contact_name={conversationDetails?.contact_name}
+      phone_number={conversationDetails?.phone_number}
+      onUpdate={onUpdate}
+      onAgentChange={handleAgentChange}
+    />
   )
 }
 
