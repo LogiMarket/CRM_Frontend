@@ -131,7 +131,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
   }
 
   return (
-    <div className="h-full flex flex-col bg-muted/20">
+    <div className="h-full flex flex-col bg-transparent">
       <ScrollArea className="flex-1">
         <div className="space-y-4 p-4">
         {conversations.map((conv) => (
@@ -139,10 +139,10 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
             key={conv.id}
             onClick={() => onSelectConversation(conv.id)}
             className={cn(
-              "relative w-full rounded-xl border bg-card p-4 text-left shadow-sm transition-all duration-150 cursor-pointer",
+              "relative w-full rounded-xl border bg-background p-4 text-left shadow-sm transition-all duration-150 cursor-pointer",
               selectedId === conv.id
-                ? "border-primary/70 bg-primary/5 ring-1 ring-primary/20 shadow-md"
-                : "border-border/70 hover:border-border hover:bg-card/90 hover:shadow-md",
+                ? "border-primary/60 bg-primary/10 ring-2 ring-primary/25 shadow-md"
+                : "border-border/70 hover:border-border hover:shadow-md hover:-translate-y-px",
             )}
           >
             <div className="flex items-start gap-3">
