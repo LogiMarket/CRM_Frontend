@@ -4,6 +4,74 @@ import { sql, isDemoMode } from "@/lib/db"
 
 export const runtime = "nodejs"
 
+let _hasConversationChannelCols: boolean | null = null
+let _hasMessagesExtendedCols: boolean | null = null
+let _messagesConversationIdType: "uuid" | "number" | "unknown" | null = null
+
+async function hasConversationChannelCols(): Promise<boolean> {
+  if (_hasConversationChannelCols !== null) return _hasConversationChannelCols
+  try {
+    const rows = await sql!`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'conversations'
+        AND column_name IN ('channel', 'external_user_id')
+      ORDER BY column_name
+    `
+    _hasConversationChannelCols = Array.isArray(rows) && rows.length === 2
+  } catch {
+    _hasConversationChannelCols = false
+  }
+  return _hasConversationChannelCols
+}
+
+async function hasMessagesExtendedCols(): Promise<boolean> {
+  if (_hasMessagesExtendedCols !== null) return _hasMessagesExtendedCols
+  try {
+    const rows = await sql!`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'messages'
+        AND column_name IN ('channel', 'external_message_id', 'direction')
+      ORDER BY column_name
+    `
+    _hasMessagesExtendedCols = Array.isArray(rows) && rows.length === 3
+  } catch {
+    _hasMessagesExtendedCols = false
+  }
+  return _hasMessagesExtendedCols
+}
+
+async function getMessagesConversationIdType(): Promise<"uuid" | "number" | "unknown"> {
+  if (_messagesConversationIdType) return _messagesConversationIdType
+  try {
+    const rows = await sql!`
+      SELECT data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_name = 'messages'
+        AND column_name = 'conversation_id'
+      LIMIT 1
+    `
+    const row = rows?.[0]
+    const dataType = String(row?.data_type || "").toLowerCase()
+    const udtName = String(row?.udt_name || "").toLowerCase()
+    if (dataType === "uuid" || udtName === "uuid") {
+      _messagesConversationIdType = "uuid"
+    } else if (dataType.includes("integer") || dataType.includes("bigint") || ["int2", "int4", "int8"].includes(udtName)) {
+      _messagesConversationIdType = "number"
+    } else {
+      _messagesConversationIdType = "unknown"
+    }
+  } catch {
+    _messagesConversationIdType = "unknown"
+  }
+  return _messagesConversationIdType
+}
+
+function isUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""))
+}
+
 function normalizeToDigits(value: string) {
   return String(value || "").replace("whatsapp:", "").replace(/\D/g, "")
 }
@@ -83,100 +151,37 @@ export async function POST(
 
     // Lookup recipient (WhatsApp "to") by conversation id
     let recipientDigits = ""
-    try {
-      const conv = await sql!`
-        SELECT
-          conv.channel,
-          conv.external_user_id,
-          c.phone_number
-        FROM conversations conv
-        LEFT JOIN contacts c ON conv.contact_id = c.id
-        WHERE conv.id::text = ${id}
-        LIMIT 1
-      `
+    const includeConvChannel = await hasConversationChannelCols()
+    const convRows = includeConvChannel
+      ? await sql!`
+          SELECT
+            conv.channel,
+            conv.external_user_id,
+            c.phone_number
+          FROM conversations conv
+          LEFT JOIN contacts c ON conv.contact_id = c.id
+          WHERE conv.id::text = ${id}
+          LIMIT 1
+        `
+      : await sql!`
+          SELECT
+            c.phone_number
+          FROM conversations conv
+          LEFT JOIN contacts c ON conv.contact_id = c.id
+          WHERE conv.id::text = ${id}
+          LIMIT 1
+        `
 
-      if (conv?.[0]) {
-        const channel = String(conv[0].channel || "whatsapp")
-        if (channel !== "whatsapp") {
-          return NextResponse.json(
-            { error: `Unsupported channel for media send: ${channel}` },
-            { status: 400 },
-          )
-        }
-        recipientDigits = normalizeToDigits(conv[0].external_user_id || conv[0].phone_number || "")
+    if (convRows?.[0]) {
+      const row: any = convRows[0]
+      const channel = includeConvChannel ? String(row.channel || "whatsapp") : "whatsapp"
+      if (channel !== "whatsapp") {
+        return NextResponse.json(
+          { error: `Unsupported channel for media send: ${channel}` },
+          { status: 400 },
+        )
       }
-    } catch (e: any) {
-      const message = String(e?.message || "")
-      const code = String(e?.code || "")
-
-      const missingColumn =
-        message.includes("conv.channel") ||
-        message.includes("conv.external_user_id") ||
-        message.includes("column conv.channel") ||
-        message.includes("column conv.external_user_id")
-
-      // fallback to CAST if id is integer OR to schema without those columns
-      try {
-        if (missingColumn && (code === "42703" || !code)) {
-          const conv = await sql!`
-            SELECT
-              c.phone_number
-            FROM conversations conv
-            LEFT JOIN contacts c ON conv.contact_id = c.id
-            WHERE conv.id::text = ${id}
-            LIMIT 1
-          `
-          if (conv?.[0]) {
-            recipientDigits = normalizeToDigits(conv[0].phone_number || "")
-          }
-        } else {
-          const conv = await sql!`
-            SELECT
-              conv.channel,
-              conv.external_user_id,
-              c.phone_number
-            FROM conversations conv
-            LEFT JOIN contacts c ON conv.contact_id = c.id
-            WHERE CAST(conv.id AS VARCHAR) = ${id}
-            LIMIT 1
-          `
-
-          if (conv?.[0]) {
-            const channel = String(conv[0].channel || "whatsapp")
-            if (channel !== "whatsapp") {
-              return NextResponse.json(
-                { error: `Unsupported channel for media send: ${channel}` },
-                { status: 400 },
-              )
-            }
-            recipientDigits = normalizeToDigits(conv[0].external_user_id || conv[0].phone_number || "")
-          }
-        }
-      } catch (e2: any) {
-        const message2 = String(e2?.message || "")
-        const code2 = String(e2?.code || "")
-        const missingColumn2 =
-          message2.includes("conv.channel") ||
-          message2.includes("conv.external_user_id") ||
-          message2.includes("column conv.channel") ||
-          message2.includes("column conv.external_user_id")
-
-        if (missingColumn2 && (code2 === "42703" || !code2)) {
-          const conv = await sql!`
-            SELECT
-              c.phone_number
-            FROM conversations conv
-            LEFT JOIN contacts c ON conv.contact_id = c.id
-            WHERE CAST(conv.id AS VARCHAR) = ${id}
-            LIMIT 1
-          `
-          if (conv?.[0]) {
-            recipientDigits = normalizeToDigits(conv[0].phone_number || "")
-          }
-        } else {
-          throw e2
-        }
-      }
+      recipientDigits = normalizeToDigits((includeConvChannel ? row.external_user_id : "") || row.phone_number || "")
     }
 
     if (!recipientDigits) {
@@ -272,63 +277,77 @@ export async function POST(
     // 3) Store message in DB (best-effort, compatible with multiple schemas)
     let inserted: any = null
     try {
-      const rows = await sql!`
-        INSERT INTO messages (
-          conversation_id,
-          sender_type,
-          sender_id,
-          content,
-          channel,
-          external_message_id,
-          direction,
-          message_type,
-          metadata,
-          created_at
-        )
-        VALUES (
-          ${id}::uuid,
-          'agent',
-          ${user.id},
-          ${storedContent},
-          'whatsapp',
-          ${externalMessageId},
-          'outbound',
-          ${type},
-          ${JSON.stringify(metadata)}::jsonb,
-          NOW()
-        )
-        RETURNING id, content, sender_type, sender_id, created_at, message_type, metadata
-      `
-      inserted = rows?.[0] || null
-    } catch (e1: any) {
-      // Retry as integer id or reduced columns
-      try {
-        const rows = await sql!`
-          INSERT INTO messages (
-            conversation_id,
-            sender_type,
-            sender_id,
-            content,
-            message_type,
-            metadata,
-            created_at
-          )
-          VALUES (
-            ${Number.parseInt(id)},
-            'agent',
-            ${user.id},
-            ${storedContent},
-            ${type},
-            ${JSON.stringify(metadata)}::jsonb,
-            NOW()
-          )
-          RETURNING id, content, sender_type, sender_id, created_at, message_type, metadata
-        `
-        inserted = rows?.[0] || null
-      } catch (e2) {
-        // don't fail send if DB insert fails
+      const useExtended = await hasMessagesExtendedCols()
+      const convIdType = await getMessagesConversationIdType()
+
+      const idString = String(id)
+      const idAsNumber = Number.parseInt(idString, 10)
+      const canUseUuid = convIdType === "uuid" && isUuid(idString)
+      const canUseNumber = convIdType === "number" && Number.isFinite(idAsNumber)
+
+      if (convIdType === "uuid" && !canUseUuid) {
+        // If schema expects uuid but we don't have a uuid, skip DB insert.
         inserted = null
+      } else if (convIdType === "number" && !canUseNumber) {
+        inserted = null
+      } else {
+        const conversationIdValue = canUseUuid ? sql`${idString}::uuid` : sql`${idAsNumber}`
+
+        const rows = useExtended
+          ? await sql!`
+              INSERT INTO messages (
+                conversation_id,
+                sender_type,
+                sender_id,
+                content,
+                channel,
+                external_message_id,
+                direction,
+                message_type,
+                metadata,
+                created_at
+              )
+              VALUES (
+                ${conversationIdValue},
+                'agent',
+                ${user.id},
+                ${storedContent},
+                'whatsapp',
+                ${externalMessageId},
+                'outbound',
+                ${type},
+                ${JSON.stringify(metadata)}::jsonb,
+                NOW()
+              )
+              RETURNING id, content, sender_type, sender_id, created_at, message_type, metadata
+            `
+          : await sql!`
+              INSERT INTO messages (
+                conversation_id,
+                sender_type,
+                sender_id,
+                content,
+                message_type,
+                metadata,
+                created_at
+              )
+              VALUES (
+                ${conversationIdValue},
+                'agent',
+                ${user.id},
+                ${storedContent},
+                ${type},
+                ${JSON.stringify(metadata)}::jsonb,
+                NOW()
+              )
+              RETURNING id, content, sender_type, sender_id, created_at, message_type, metadata
+            `
+
+        inserted = rows?.[0] || null
       }
+    } catch {
+      // don't fail send if DB insert fails
+      inserted = null
     }
 
     // Update conversation timestamps (best-effort)
