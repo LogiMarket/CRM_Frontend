@@ -228,6 +228,20 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
     const filename = msg?.metadata?.filename || msg?.metadata?.media_filename || ""
     const caption = msg?.metadata?.caption || ""
 
+    const isPlaceholderContent = (value: unknown) => {
+      const text = String(value || "").trim().toLowerCase()
+      return (
+        text === "[imagen]" ||
+        text === "[sticker]" ||
+        text === "[documento]" ||
+        text === "[audio]" ||
+        text === "[video]" ||
+        /^\[[a-z0-9_\- ]+\s+mensaje\]$/.test(text)
+      )
+    }
+
+    const textToShow = caption || (!isPlaceholderContent(msg.content) ? String(msg.content || "").trim() : "")
+
     if (!mediaUrl || type === "text") {
       return <p className="text-sm leading-relaxed">{msg.content}</p>
     }
@@ -241,9 +255,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
             className="max-w-full rounded-md border border-border"
             loading="lazy"
           />
-          {(caption || msg.content) && (
-            <p className="text-sm leading-relaxed">{caption || msg.content}</p>
-          )}
+          {textToShow && <p className="text-sm leading-relaxed">{textToShow}</p>}
         </div>
       )
     }
@@ -256,9 +268,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
             controls
             className="max-w-full rounded-md border border-border"
           />
-          {(caption || msg.content) && (
-            <p className="text-sm leading-relaxed">{caption || msg.content}</p>
-          )}
+          {textToShow && <p className="text-sm leading-relaxed">{textToShow}</p>}
         </div>
       )
     }
@@ -267,9 +277,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
       return (
         <div className="space-y-2">
           <audio src={mediaUrl} controls className="w-full" />
-          {(caption || msg.content) && (
-            <p className="text-sm leading-relaxed">{caption || msg.content}</p>
-          )}
+          {textToShow && <p className="text-sm leading-relaxed">{textToShow}</p>}
         </div>
       )
     }
