@@ -148,9 +148,12 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
             response.statusText ||
             "No se pudo enviar el adjunto."
 
+          const hint = data?.hint ? String(data.hint) : ""
+          const description = hint ? `${String(detailsMessage)}\n${hint}` : String(detailsMessage)
+
           toast({
             title: "Error al enviar adjunto",
-            description: String(detailsMessage),
+            description,
             variant: "destructive",
           })
 

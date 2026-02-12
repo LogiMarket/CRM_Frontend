@@ -44,13 +44,19 @@ export async function POST(
 
     if (!accessToken) {
       return NextResponse.json(
-        { error: "WHATSAPP_ACCESS_TOKEN missing" },
+        {
+          error: "WHATSAPP_ACCESS_TOKEN missing",
+          hint: "Configura WHATSAPP_ACCESS_TOKEN en Railway (servicio del frontend). Debe ser un token válido de WhatsApp Cloud API.",
+        },
         { status: 500 },
       )
     }
     if (!phoneNumberId) {
       return NextResponse.json(
-        { error: "WHATSAPP_PHONE_NUMBER_ID missing" },
+        {
+          error: "WHATSAPP_PHONE_NUMBER_ID missing",
+          hint: "Configura WHATSAPP_PHONE_NUMBER_ID en Railway (servicio del frontend). Ojo: NO es el WABA ID; es el Phone Number ID que ves en Meta Developers > WhatsApp > API Setup.",
+        },
         { status: 500 },
       )
     }
