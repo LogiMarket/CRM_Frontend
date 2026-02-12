@@ -140,7 +140,8 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
             key={conv.id}
             onClick={() => onSelectConversation(conv.id)}
             className={cn(
-              "relative w-full mr-4 rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
+              // NOTE: avoid `w-full` + right margin (it gets clipped). This keeps a real gutter before the chat divider.
+              "relative w-[calc(100%-1rem)] rounded-xl border bg-background p-4 text-left shadow-sm transition-[box-shadow,background-color,border-color] duration-150 cursor-pointer hover:z-10",
               selectedId === conv.id
                 ? "z-10 border-primary/60 bg-primary/10 ring-2 ring-primary/25 ring-offset-2 ring-offset-muted/40 shadow-md"
                 : "border-border/70 hover:border-border hover:shadow-md",
