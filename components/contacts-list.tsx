@@ -5,19 +5,123 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
+import { Pencil, Trash2 } from "lucide-react"
 import { cn, formatContactDisplayName, getContactAvatarText } from "@/lib/utils"
 import { useContacts, type Contact } from "@/hooks/use-contacts"
+import { toast } from "@/hooks/use-toast"
 
 interface ContactsListProps {
   selectedId?: string
   onSelect?: (contact: Contact) => void
   onChat: (contact: Contact) => void
   headerRight?: React.ReactNode
+  onDeleted?: (deletedId: string | number) => void
 }
 
-export function ContactsList({ selectedId, onSelect, onChat, headerRight }: ContactsListProps) {
+export function ContactsList({ selectedId, onSelect, onChat, headerRight, onDeleted }: ContactsListProps) {
   const { contacts, loading, error, refetch } = useContacts()
   const [query, setQuery] = useState("")
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const [editId, setEditId] = useState<string | number | null>(null)
+  const [editChannel, setEditChannel] = useState<string>("whatsapp")
+  const [editName, setEditName] = useState("")
+  const [editPhone, setEditPhone] = useState("")
+  const [editExternal, setEditExternal] = useState("")
+
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteId, setDeleteId] = useState<string | number | null>(null)
+  const [deleteLabel, setDeleteLabel] = useState<string>("")
+
+  const openEdit = (c: Contact) => {
+    setEditId(c.id)
+    setEditChannel(String(c.channel || "whatsapp"))
+    setEditName(String(c.name || ""))
+    setEditPhone(String(c.phone_number || ""))
+    setEditExternal(String(c.external_user_id || ""))
+    setEditOpen(true)
+  }
+
+  const openDelete = (c: Contact) => {
+    setDeleteId(c.id)
+    setDeleteLabel(String(c.name || c.phone_number || c.external_user_id || c.id))
+    setDeleteOpen(true)
+  }
+
+  const handleSaveEdit = async () => {
+    if (editId === null) return
+    try {
+      setEditing(true)
+      const res = await fetch(`/api/contacts/${encodeURIComponent(String(editId))}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          name: editName,
+          phone_number: editPhone,
+          external_user_id: editExternal,
+        }),
+      })
+
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        toast({ title: "Error", description: data?.error || "No se pudo actualizar el contacto", variant: "destructive" })
+        return
+      }
+
+      toast({ title: "Contacto actualizado", description: "Se guardaron los cambios." })
+      setEditOpen(false)
+      await refetch()
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "No se pudo actualizar el contacto", variant: "destructive" })
+    } finally {
+      setEditing(false)
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (deleteId === null) return
+    try {
+      setDeleting(true)
+      const res = await fetch(`/api/contacts/${encodeURIComponent(String(deleteId))}`, {
+        method: "DELETE",
+      })
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        toast({ title: "Error", description: data?.error || "No se pudo eliminar el contacto", variant: "destructive" })
+        return
+      }
+
+      toast({ title: "Contacto eliminado" })
+      setDeleteOpen(false)
+      onDeleted?.(String(deleteId))
+      await refetch()
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "No se pudo eliminar el contacto", variant: "destructive" })
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const filteredContacts = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -140,18 +244,50 @@ export function ContactsList({ selectedId, onSelect, onChat, headerRight }: Cont
                       </div>
 
                       <div className="flex-shrink-0">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="whitespace-nowrap"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            onChat(c)
-                          }}
-                        >
-                          Chatear
-                        </Button>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="whitespace-nowrap"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              onChat(c)
+                            }}
+                          >
+                            Chatear
+                          </Button>
+
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              openEdit(c)
+                            }}
+                            title="Editar"
+                            aria-label="Editar"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-9 w-9 text-red-600 hover:text-red-700"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              openDelete(c)
+                            }}
+                            title="Eliminar"
+                            aria-label="Eliminar"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -161,6 +297,63 @@ export function ContactsList({ selectedId, onSelect, onChat, headerRight }: Cont
           </div>
         </ScrollArea>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Actualizar contacto</DialogTitle>
+            <DialogDescription>
+              Edita la información del contacto. El canal se mantiene como <span className="font-medium">{editChannel}</span>.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="grid gap-4">
+            <div className="grid gap-2">
+              <Label>Nombre</Label>
+              <Input value={editName} onChange={(e) => setEditName(e.target.value)} placeholder="Ej. Ana Martínez" />
+            </div>
+
+            {String(editChannel).toLowerCase() === "facebook" ? (
+              <div className="grid gap-2">
+                <Label>PSID (external_user_id)</Label>
+                <Input value={editExternal} onChange={(e) => setEditExternal(e.target.value)} placeholder="Ej. 1234567890" />
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                <Label>Teléfono</Label>
+                <Input value={editPhone} onChange={(e) => setEditPhone(e.target.value)} placeholder="Ej. +52 1 5611 205 872" />
+                <p className="text-xs text-muted-foreground">Se normaliza a formato WhatsApp automáticamente.</p>
+              </div>
+            )}
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditOpen(false)} disabled={editing}>
+              Cancelar
+            </Button>
+            <Button onClick={() => void handleSaveEdit()} disabled={editing}>
+              {editing ? "Guardando..." : "Guardar"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Eliminar contacto</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará el contacto <span className="font-medium">{deleteLabel}</span>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={() => void handleConfirmDelete()} disabled={deleting}>
+              {deleting ? "Eliminando..." : "Eliminar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

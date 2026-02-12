@@ -103,13 +103,16 @@ export default function ContactosPage() {
   return (
     <>
       <InboxHeader />
-      <div className="flex flex-1 overflow-hidden gap-0">
-        <div className="flex h-full w-96 flex-col border-r border-border bg-card flex-shrink-0">
+      <div className="flex flex-1 overflow-hidden">
+        <div className="flex h-full w-full flex-col">
           <ContactsList
             key={refreshKey}
             selectedId={selectedContactId}
             onSelect={handleSelectContact}
             onChat={handleChatContact}
+            onDeleted={(deletedId) => {
+              if (String(deletedId) === String(selectedContactId)) setSelectedContactId(undefined)
+            }}
             headerRight={
               <Dialog open={newOpen} onOpenChange={setNewOpen}>
                 <DialogTrigger asChild>
@@ -175,24 +178,6 @@ export default function ContactosPage() {
               </Dialog>
             }
           />
-        </div>
-
-        <div className="w-4 flex-shrink-0 bg-muted/40" aria-hidden="true" />
-
-        <div className="flex flex-1 flex-col min-w-0">
-          <div className="flex h-full items-center justify-center p-6">
-            <div className="max-w-lg rounded-xl border bg-card p-6 text-center shadow-sm">
-              <p className="text-lg font-semibold">Contactos</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Selecciona un contacto y presiona <span className="font-medium">Chatear</span> para ir a Conversaciones.
-              </p>
-              {selectedContactId && (
-                <p className="mt-3 text-xs text-muted-foreground">
-                  Contacto seleccionado: <span className="font-medium">{selectedContactId}</span>
-                </p>
-              )}
-            </div>
-          </div>
         </div>
       </div>
     </>
