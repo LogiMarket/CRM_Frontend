@@ -43,7 +43,7 @@ export default function ConversacionesPage() {
   return (
     <>
       <InboxHeader />
-      <div className="flex flex-1 overflow-hidden gap-4">
+      <div className="flex flex-1 overflow-hidden gap-0">
         <div className="flex h-full w-80 flex-col border-r border-border bg-card flex-shrink-0">
           <ConversationList
             key={refreshKey}
@@ -52,6 +52,9 @@ export default function ConversacionesPage() {
             onlyAssigned={onlyAssigned}
           />
         </div>
+
+        {/* Visual spacer between panels */}
+        <div className="w-4 flex-shrink-0 bg-muted/40" aria-hidden="true" />
 
         <div className="flex flex-1 flex-col min-w-0">
           <ChatArea
@@ -63,6 +66,9 @@ export default function ConversacionesPage() {
             onUpdate={handleUpdate}
           />
         </div>
+
+        {/* Visual spacer between panels */}
+        <div className="w-4 flex-shrink-0 bg-muted/40" aria-hidden="true" />
 
         <div className="flex h-full w-72 flex-col border-l border-border bg-card flex-shrink-0">
           <OrdersPanel contactId={selectedContactId} />

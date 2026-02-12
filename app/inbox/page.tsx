@@ -119,7 +119,7 @@ export default function InboxPage() {
   return (
     <>
       <InboxHeader />
-      <div className="flex h-full flex-1 overflow-hidden gap-4">
+      <div className="flex h-full flex-1 overflow-hidden gap-0">
         {/* Conversations list - responsive width */}
         <div className="hidden md:flex h-full w-80 flex-col border-r border-border bg-card flex-shrink-0">
           <ConversationList
@@ -128,6 +128,9 @@ export default function InboxPage() {
             onSelectConversation={handleSelectConversation}
           />
         </div>
+
+        {/* Visual spacer between panels */}
+        <div className="hidden md:block w-4 flex-shrink-0 bg-muted/40" aria-hidden="true" />
 
         {/* Chat area - flex grow */}
         <div className="flex flex-1 flex-col min-w-0">
@@ -141,6 +144,8 @@ export default function InboxPage() {
 
         {/* Orders/Details panel - responsive */}
         {showOrdersPanel && (
+          <>
+          <div className="hidden xl:block w-4 flex-shrink-0 bg-muted/40" aria-hidden="true" />
           <div className="hidden xl:flex h-full w-72 flex-col border-l border-border bg-card flex-shrink-0 overflow-hidden">
               <OrdersPanel 
                 conversationDetails={conversationDetails}
@@ -148,6 +153,7 @@ export default function InboxPage() {
                 onAgentChange={handleAgentChange}
               />
           </div>
+          </>
         )}
       </div>
     </>

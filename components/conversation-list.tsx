@@ -134,7 +134,7 @@ export function ConversationList({ selectedId, onSelectConversation, onlyAssigne
     <div className="h-full flex flex-col bg-transparent">
       <ScrollArea className="flex-1">
         {/* Match reference UI: compact cards with consistent inner margin */}
-        <div className="space-y-3 px-4 py-4 pr-6">
+        <div className="space-y-3 px-4 py-4 pr-10">
         {conversations.map((conv) => (
           <div
             key={conv.id}
