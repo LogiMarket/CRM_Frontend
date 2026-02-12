@@ -5,6 +5,8 @@ import { DEMO_CONVERSATIONS } from "@/lib/demo-data"
 
 let _hasConversationChannelColumns: boolean | null = null
 let _hasConversationExternalConversationIdColumn: boolean | null = null
+let _conversationStatusOpenValue: string | null = null
+let _conversationStatusClosedValue: string | null = null
 
 async function hasConversationChannelColumns(): Promise<boolean> {
   if (_hasConversationChannelColumns !== null) return _hasConversationChannelColumns
@@ -38,6 +40,57 @@ async function hasConversationExternalConversationIdColumn(): Promise<boolean> {
     _hasConversationExternalConversationIdColumn = false
   }
   return _hasConversationExternalConversationIdColumn
+}
+
+async function getConversationStatusValues(): Promise<{ openValue: string; closedValue: string | null }> {
+  if (_conversationStatusOpenValue !== null) {
+    return { openValue: _conversationStatusOpenValue, closedValue: _conversationStatusClosedValue }
+  }
+
+  // Defaults for non-enum schemas
+  let openValue = "open"
+  let closedValue: string | null = "closed"
+
+  try {
+    const cols: any[] = await sql!`
+      SELECT data_type, udt_name
+      FROM information_schema.columns
+      WHERE table_name = 'conversations'
+        AND column_name = 'status'
+      LIMIT 1
+    `
+
+    const dataType = String(cols?.[0]?.data_type || "")
+    const udtName = String(cols?.[0]?.udt_name || "")
+
+    if (dataType.toUpperCase() === "USER-DEFINED" && udtName) {
+      const labels: any[] = await sql!`
+        SELECT e.enumlabel
+        FROM pg_type t
+        JOIN pg_enum e ON t.oid = e.enumtypid
+        WHERE t.typname = ${udtName}
+        ORDER BY e.enumsortorder
+      `
+      const enumLabels = (labels || []).map((r) => String(r.enumlabel))
+
+      const pickFirst = (candidates: string[]) => enumLabels.find((l) => candidates.includes(l))
+      openValue =
+        pickFirst(["open", "active", "new", "pending"]) ||
+        enumLabels[0] ||
+        openValue
+
+      // Closed can vary by schema
+      closedValue =
+        pickFirst(["closed", "resolved", "archived"]) ||
+        null
+    }
+  } catch {
+    // keep defaults
+  }
+
+  _conversationStatusOpenValue = openValue
+  _conversationStatusClosedValue = closedValue
+  return { openValue, closedValue }
 }
 
 export async function POST(request: Request) {
@@ -83,17 +136,28 @@ export async function POST(request: Request) {
 
     const contact = contactRows[0]
 
+    const { openValue: statusOpenValue, closedValue: statusClosedValue } = await getConversationStatusValues()
+
     // Find latest open/assigned conversation
     let conversationRows: any[] = []
     try {
-      conversationRows = await sql!`
-        SELECT *
-        FROM conversations
-        WHERE contact_id = ${contact.id}
-          AND status IN ('open', 'assigned')
-        ORDER BY created_at DESC
-        LIMIT 1
-      `
+      // IMPORTANT: compare on status::text to avoid enum cast errors across deployments.
+      conversationRows = statusClosedValue
+        ? await sql!`
+            SELECT *
+            FROM conversations
+            WHERE contact_id = ${contact.id}
+              AND status::text != ${statusClosedValue}
+            ORDER BY created_at DESC
+            LIMIT 1
+          `
+        : await sql!`
+            SELECT *
+            FROM conversations
+            WHERE contact_id = ${contact.id}
+            ORDER BY created_at DESC
+            LIMIT 1
+          `
     } catch {
       conversationRows = []
     }
@@ -121,7 +185,7 @@ export async function POST(request: Request) {
           )
           VALUES (
             ${contact.id},
-            'open',
+            ${statusOpenValue},
             'medium',
             ${channel},
             ${externalUserId},
@@ -146,7 +210,7 @@ export async function POST(request: Request) {
           )
           VALUES (
             ${contact.id},
-            'open',
+            ${statusOpenValue},
             'medium',
             ${channel},
             ${externalUserId},
@@ -168,7 +232,7 @@ export async function POST(request: Request) {
           )
           VALUES (
             ${contact.id},
-            'open',
+            ${statusOpenValue},
             'medium',
             NOW(),
             NOW(),
