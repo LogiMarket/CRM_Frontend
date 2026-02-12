@@ -1,8 +1,10 @@
 "use client"
 
+import { useMemo, useState } from "react"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Avatar, AvatarFallback } from "@/components/ui/avatar"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { cn, formatContactDisplayName, getContactAvatarText } from "@/lib/utils"
 import { useContacts, type Contact } from "@/hooks/use-contacts"
 
@@ -14,6 +16,20 @@ interface ContactsListProps {
 
 export function ContactsList({ selectedId, onSelect, headerRight }: ContactsListProps) {
   const { contacts, loading, error, refetch } = useContacts()
+  const [query, setQuery] = useState("")
+
+  const filteredContacts = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    if (!q) return contacts
+
+    return contacts.filter((c) => {
+      const channel = String(c.channel || "whatsapp")
+      const name = formatContactDisplayName(c.name || "", channel).toLowerCase()
+      const phone = formatContactDisplayName(c.phone_number || "", channel).toLowerCase()
+      const ext = String(c.external_user_id || "").toLowerCase()
+      return name.includes(q) || phone.includes(q) || ext.includes(q)
+    })
+  }, [contacts, query])
 
   if (loading) {
     return (
@@ -50,20 +66,40 @@ export function ContactsList({ selectedId, onSelect, headerRight }: ContactsList
             {headerRight}
           </div>
         </div>
-        <ScrollArea className="h-[calc(100%-52px)]">
+
+        <div className="border-b border-border px-3 py-2">
+          <Input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Buscar por nombre, teléfono o ID..."
+          />
+          {!!query.trim() && (
+            <div className="mt-2 flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Mostrando {filteredContacts.length} de {contacts.length}
+              </p>
+              <Button variant="ghost" size="sm" onClick={() => setQuery("")}
+              >
+                Limpiar
+              </Button>
+            </div>
+          )}
+        </div>
+
+        <ScrollArea className="h-[calc(100%-112px)]">
           <div className="space-y-2 p-3">
-            {contacts.length === 0 ? (
+            {filteredContacts.length === 0 ? (
               <div className="rounded-lg border bg-background p-4 text-center text-sm text-muted-foreground">
-                No hay contactos
+                {contacts.length === 0 ? "No hay contactos" : "Sin resultados"}
               </div>
             ) : (
-              contacts.map((c) => {
+              filteredContacts.map((c) => {
                 const channel = String(c.channel || "whatsapp")
                 const displayName = formatContactDisplayName(c.name || c.phone_number, channel)
                 const secondary = formatContactDisplayName(c.phone_number, channel)
 
                 return (
-                  <button
+                  <div
                     key={String(c.id)}
                     onClick={() => onSelect(c)}
                     className={cn(
@@ -72,6 +108,14 @@ export function ContactsList({ selectedId, onSelect, headerRight }: ContactsList
                         ? "border-primary/60 bg-primary/10 ring-2 ring-inset ring-primary/25"
                         : "border-border/70 hover:border-border",
                     )}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault()
+                        onSelect(c)
+                      }
+                    }}
                   >
                     <div className="flex items-center gap-3">
                       <Avatar className="h-10 w-10 ring-2 ring-background shadow-sm">
@@ -93,8 +137,22 @@ export function ContactsList({ selectedId, onSelect, headerRight }: ContactsList
                         </div>
                         <p className="text-xs text-muted-foreground truncate">{secondary}</p>
                       </div>
+
+                      <div className="flex-shrink-0">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            onSelect(c)
+                          }}
+                        >
+                          Chatear
+                        </Button>
+                      </div>
                     </div>
-                  </button>
+                  </div>
                 )
               })
             )}
