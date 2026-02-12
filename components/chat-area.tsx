@@ -60,6 +60,7 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [sendingMedia, setSendingMedia] = useState(false)
+  const [resolvedContactName, setResolvedContactName] = useState<string | undefined>(contactName)
   const [deleteConversationOpen, setDeleteConversationOpen] = useState(false)
   const [deletingConversation, setDeletingConversation] = useState(false)
   const [pendingFile, setPendingFile] = useState<File | null>(null)
@@ -84,6 +85,35 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
       const intervalId = setInterval(() => fetchMessages(), 5000)
       return () => clearInterval(intervalId)
     }
+  }, [conversationId])
+
+  useEffect(() => {
+    setResolvedContactName(contactName)
+  }, [contactName])
+
+  useEffect(() => {
+    const shouldResolve = (value: string | undefined) => {
+      const v = String(value || "").trim()
+      if (!v) return true
+      return v.toLowerCase().startsWith("whatsapp:+") || v.toLowerCase().startsWith("fb_")
+    }
+
+    const resolve = async () => {
+      if (!conversationId) return
+      if (!shouldResolve(resolvedContactName)) return
+      try {
+        const res = await fetch(`/api/conversations/${encodeURIComponent(String(conversationId))}`)
+        const data = await res.json().catch(() => null)
+        const name = data?.contact_name ? String(data.contact_name) : ""
+        if (name.trim()) setResolvedContactName(name.trim())
+      } catch {
+        // ignore
+      }
+    }
+
+    void resolve()
+    // Only when switching conversation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationId])
 
   const handleDeleteConversation = async () => {
@@ -545,12 +575,12 @@ export function ChatArea({ conversationId, contactName, currentAgentId, channel 
         <div className="flex items-center gap-3">
           <Avatar className="h-10 w-10 transition-transform duration-200 hover:scale-105">
             <AvatarFallback className="bg-primary text-primary-foreground font-semibold">
-              {contactName ? getInitials(contactName) : "?"}
+              {resolvedContactName ? getInitials(resolvedContactName) : "?"}
             </AvatarFallback>
           </Avatar>
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="font-semibold text-sm text-foreground">{contactName || "Contacto"}</h2>
+              <h2 className="font-semibold text-sm text-foreground">{resolvedContactName || "Contacto"}</h2>
               {/* Channel badge */}
               {channel && (
                 <span className={cn(

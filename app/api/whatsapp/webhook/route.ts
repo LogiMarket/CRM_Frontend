@@ -55,13 +55,12 @@ export async function POST(request: Request) {
         const metadata = value?.metadata
         const phoneNumberId = metadata?.phone_number_id || "unknown"
 
+        // Map of wa_id -> *real* profile name (when Meta provides it)
         const contactsByWaId = new Map<string, string>()
         for (const contact of value?.contacts || []) {
           const waId = contact?.wa_id
           const name = contact?.profile?.name
-          if (waId) {
-            contactsByWaId.set(waId, name || `WhatsApp ${waId.slice(-6)}`)
-          }
+          if (waId && typeof name === "string" && name.trim()) contactsByWaId.set(waId, name.trim())
         }
 
         for (const message of value?.messages || []) {
@@ -129,7 +128,9 @@ async function handleIncomingMessage(
   const messageId = message.id
   const timestamp = message.timestamp ? Number.parseInt(message.timestamp, 10) * 1000 : Date.now()
   const parsed = parseIncomingMessage(message)
-  const contactName = contactsByWaId.get(senderId) || `WhatsApp ${String(senderId).slice(-6)}`
+  const profileName = contactsByWaId.get(senderId)
+  const fallbackName = `whatsapp:+${normalizePhoneNumber(senderId)}`
+  const contactName = profileName || fallbackName
 
   console.log("[WhatsApp] Processing message:", {
     senderId,
@@ -166,6 +167,27 @@ async function handleIncomingMessage(
         )
         RETURNING *
       `
+    } else {
+      // If we now have a real profile name, upgrade any placeholder name.
+      if (profileName) {
+        const existingName = String((contact as any)[0]?.name || "").trim()
+        const existingPhone = String((contact as any)[0]?.phone_number || "").trim()
+        const looksLikePhone = existingName && /^(whatsapp:\+|\+?\d{7,})/.test(existingName)
+        const looksPlaceholder = !existingName || existingName.toLowerCase().startsWith("whatsapp ") || looksLikePhone || existingName === existingPhone
+
+        if (looksPlaceholder && existingName !== profileName) {
+          try {
+            contact = await sql!`
+              UPDATE contacts
+              SET name = ${profileName}
+              WHERE id = ${contact[0].id}
+              RETURNING *
+            `
+          } catch (e) {
+            console.warn("[WhatsApp] Failed to update contact name:", e)
+          }
+        }
+      }
     }
 
     const contactId = contact[0].id
