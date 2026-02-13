@@ -125,9 +125,13 @@ export default function EnviosMasivosPage() {
   const [filter, setFilter] = useState<CampaignStatus>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
+  const [sendingBulk, setSendingBulk] = useState(false)
   const [newCampaign, setNewCampaign] = useState({
     name: "",
     message: "",
+    whatsappTemplateName: "",
+    whatsappTemplateLanguage: "",
+    whatsappTemplateBodyParams: "",
     scheduleDate: "",
     scheduleTime: "",
   })
@@ -224,15 +228,15 @@ export default function EnviosMasivosPage() {
   const totalRead = campaigns.reduce((acc, c) => acc + c.read, 0)
   const totalReplied = campaigns.reduce((acc, c) => acc + c.replied, 0)
 
-  const handleCreateCampaign = (mode: "send" | "schedule") => {
+  const handleCreateCampaign = async (mode: "send" | "schedule") => {
     const name = newCampaign.name.trim()
-    const message = newCampaign.message.trim()
+    const messageTemplate = newCampaign.message.trim()
 
     if (!name) {
       toast({ title: "Falta el nombre", description: "Escribe un nombre para la campaña.", variant: "destructive" })
       return
     }
-    if (!message) {
+    if (!messageTemplate) {
       toast({ title: "Falta el mensaje", description: "Escribe el mensaje que se enviará.", variant: "destructive" })
       return
     }
@@ -242,44 +246,84 @@ export default function EnviosMasivosPage() {
     }
 
     if (mode === "schedule") {
-      if (!newCampaign.scheduleDate) {
-        toast({ title: "Falta la fecha", description: "Selecciona una fecha para programar.", variant: "destructive" })
-        return
-      }
-      if (!newCampaign.scheduleTime) {
-        toast({ title: "Falta la hora", description: "Selecciona una hora para programar.", variant: "destructive" })
-        return
-      }
+      toast({
+        title: "Programación pendiente",
+        description: "Para programar envíos reales se necesita un job/cron en el servidor. Por ahora solo está disponible 'Enviar ahora'.",
+        variant: "destructive",
+      })
+      return
     }
 
-    const today = new Date().toISOString().slice(0, 10)
-    const date = mode === "schedule" ? newCampaign.scheduleDate : today
-    const status: Campaign["status"] = mode === "schedule" ? "scheduled" : "sending"
+    try {
+      setSendingBulk(true)
 
-    const created: Campaign = {
-      id: String(Date.now()),
-      name,
-      status,
-      recipients: selectedContacts.length,
-      delivered: 0,
-      read: 0,
-      replied: 0,
-      date,
-      message,
+      const whatsappTemplateName = newCampaign.whatsappTemplateName.trim()
+      const whatsappTemplateLanguage = newCampaign.whatsappTemplateLanguage.trim()
+      const bodyParams = newCampaign.whatsappTemplateBodyParams
+        .split(/\r?\n|,/g)
+        .map((x) => x.trim())
+        .filter(Boolean)
+
+      const whatsappTemplate = whatsappTemplateName && whatsappTemplateLanguage
+        ? { name: whatsappTemplateName, language: whatsappTemplateLanguage, bodyParams }
+        : null
+
+      const res = await fetch("/api/campaigns/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactIds: selectedContacts, message: messageTemplate, whatsappTemplate }),
+      })
+
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        toast({ title: "Error", description: data?.error || "No se pudo enviar el envío masivo", variant: "destructive" })
+        return
+      }
+
+      const sent = Number(data?.sent || 0)
+      const failed = Number(data?.failed || 0)
+      const total = Number(data?.total || selectedContacts.length)
+
+      const today = new Date().toISOString().slice(0, 10)
+      const created: Campaign = {
+        id: String(Date.now()),
+        name,
+        status: failed === 0 ? "completed" : sent > 0 ? "completed" : "failed",
+        recipients: total,
+        delivered: sent,
+        read: 0,
+        replied: 0,
+        date: today,
+        message: messageTemplate,
+      }
+
+      setCampaigns((prev) => [created, ...prev])
+      setShowNewDialog(false)
+      setSelectedContacts([])
+      setNewCampaign({
+        name: "",
+        message: "",
+        whatsappTemplateName: "",
+        whatsappTemplateLanguage: "",
+        whatsappTemplateBodyParams: "",
+        scheduleDate: "",
+        scheduleTime: "",
+      })
+
+      if (failed > 0) {
+        toast({
+          title: "Envío parcial",
+          description: `Enviados: ${sent}. Fallidos: ${failed}. Total: ${total}.`,
+          variant: "destructive",
+        })
+      } else {
+        toast({ title: "Envío masivo enviado", description: `Enviados ${sent} mensajes.` })
+      }
+    } catch (e) {
+      toast({ title: "Error", description: e instanceof Error ? e.message : "No se pudo enviar el envío masivo", variant: "destructive" })
+    } finally {
+      setSendingBulk(false)
     }
-
-    setCampaigns((prev) => [created, ...prev])
-    setShowNewDialog(false)
-    setSelectedContacts([])
-    setNewCampaign({ name: "", message: "", scheduleDate: "", scheduleTime: "" })
-
-    toast({
-      title: mode === "schedule" ? "Campaña programada" : "Campaña creada",
-      description:
-        mode === "schedule"
-          ? `Se programó para ${created.date} ${newCampaign.scheduleTime}.`
-          : `Se creó el envío para ${created.recipients} destinatarios.`,
-    })
   }
 
   return (
@@ -386,6 +430,50 @@ export default function EnviosMasivosPage() {
                             ))}
                           </SelectContent>
                         </Select>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          Nota: este selector solo llena el texto del mensaje. Si quieres usar una plantilla oficial de WhatsApp (aprobada por Meta),
+                          completa los campos de abajo (name/language/params) y el envío a WhatsApp se hará como <span className="font-mono">template</span>.
+                        </p>
+                      </div>
+
+                      <div className="border rounded-lg p-3 space-y-3">
+                        <div className="text-sm font-medium">WhatsApp Template oficial (opcional)</div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <label className="text-xs font-medium mb-1 block">Template name</label>
+                            <Input
+                              placeholder="Ej: bienvenida_logimarket"
+                              value={newCampaign.whatsappTemplateName}
+                              onChange={(e) =>
+                                setNewCampaign((prev) => ({ ...prev, whatsappTemplateName: e.target.value }))
+                              }
+                            />
+                          </div>
+                          <div>
+                            <label className="text-xs font-medium mb-1 block">Language code</label>
+                            <Input
+                              placeholder="Ej: es_MX"
+                              value={newCampaign.whatsappTemplateLanguage}
+                              onChange={(e) =>
+                                setNewCampaign((prev) => ({ ...prev, whatsappTemplateLanguage: e.target.value }))
+                              }
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <label className="text-xs font-medium mb-1 block">Body params (uno por línea o separados por coma)</label>
+                          <Textarea
+                            placeholder="Ej:\n{{nombre}}"
+                            rows={2}
+                            value={newCampaign.whatsappTemplateBodyParams}
+                            onChange={(e) =>
+                              setNewCampaign((prev) => ({ ...prev, whatsappTemplateBodyParams: e.target.value }))
+                            }
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Estos params se mapean a <span className="font-mono">{"{{1}}"}</span>, <span className="font-mono">{"{{2}}"}</span>, etc. Ej: si tu template dice “Hola <span className="font-mono">{"{{1}}"}</span>”, el primer param debe ser el nombre.
+                          </p>
+                        </div>
                       </div>
 
                       <div>
@@ -494,14 +582,14 @@ export default function EnviosMasivosPage() {
                           Cancelar
                         </Button>
                         {newCampaign.scheduleDate ? (
-                          <Button className="gap-1" type="button" onClick={() => handleCreateCampaign("schedule")}>
+                          <Button className="gap-1" type="button" onClick={() => void handleCreateCampaign("schedule")} disabled={sendingBulk}>
                             <Calendar className="h-4 w-4" />
                             Programar
                           </Button>
                         ) : (
-                          <Button className="gap-1" type="button" onClick={() => handleCreateCampaign("send")}>
+                          <Button className="gap-1" type="button" onClick={() => void handleCreateCampaign("send")} disabled={sendingBulk}>
                             <Send className="h-4 w-4" />
-                            Enviar ahora
+                            {sendingBulk ? "Enviando..." : "Enviar ahora"}
                           </Button>
                         )}
                       </div>
