@@ -754,7 +754,7 @@ export default function EnviosMasivosPage() {
 
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-sm font-medium mb-1 block">Programar fecha (opcional)</label>
+                          <label className="text-sm font-medium mb-1 block">Programar fecha</label>
                           <Input
                             type="date"
                             value={newCampaign.scheduleDate}
@@ -775,17 +775,26 @@ export default function EnviosMasivosPage() {
                         <Button variant="outline" onClick={() => setShowNewDialog(false)}>
                           Cancelar
                         </Button>
-                        {newCampaign.scheduleDate ? (
-                          <Button className="gap-1" type="button" onClick={() => void handleCreateCampaign("schedule")} disabled={sendingBulk}>
-                            <Calendar className="h-4 w-4" />
-                            Programar
-                          </Button>
-                        ) : (
-                          <Button className="gap-1" type="button" onClick={() => void handleCreateCampaign("send")} disabled={sendingBulk}>
-                            <Send className="h-4 w-4" />
-                            {sendingBulk ? "Enviando..." : "Enviar ahora"}
-                          </Button>
-                        )}
+                        <Button
+                          className="gap-1"
+                          type="button"
+                          variant="outline"
+                          onClick={() => void handleCreateCampaign("schedule")}
+                          disabled={sendingBulk || !newCampaign.scheduleDate || !newCampaign.scheduleTime}
+                          title={!newCampaign.scheduleDate || !newCampaign.scheduleTime ? "Selecciona fecha y hora" : undefined}
+                        >
+                          <Calendar className="h-4 w-4" />
+                          Programar
+                        </Button>
+                        <Button
+                          className="gap-1"
+                          type="button"
+                          onClick={() => void handleCreateCampaign("send")}
+                          disabled={sendingBulk}
+                        >
+                          <Send className="h-4 w-4" />
+                          {sendingBulk ? "Enviando..." : "Enviar ahora"}
+                        </Button>
                       </div>
                     </div>
                   </DialogContent>
