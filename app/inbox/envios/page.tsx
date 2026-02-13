@@ -10,6 +10,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
 import { useContacts } from "@/hooks/use-contacts"
 import { formatContactDisplayName } from "@/lib/utils"
+import { toast } from "@/hooks/use-toast"
 import {
   Dialog,
   DialogContent,
@@ -46,7 +47,21 @@ import {
 } from "lucide-react"
 
 // Demo data (UI-only). Cuando quieras lo conectamos a DB/WhatsApp.
-const demoCampaigns = [
+type CampaignStatus = "all" | "completed" | "sending" | "scheduled" | "failed"
+
+type Campaign = {
+  id: string
+  name: string
+  status: Exclude<CampaignStatus, "all">
+  recipients: number
+  delivered: number
+  read: number
+  replied: number
+  date: string
+  message: string
+}
+
+const initialCampaigns: Campaign[] = [
   {
     id: "1",
     name: "Promoción Enero",
@@ -91,7 +106,7 @@ const demoCampaigns = [
     date: "2026-01-08",
     message: "Mensaje de prueba que falló.",
   },
-] as const
+]
 
 type Template = { id: string; name: string; message: string }
 
@@ -102,12 +117,11 @@ const demoTemplates: Template[] = [
   { id: "4", name: "Recordatorio", message: "Hola {{nombre}}, te recordamos que tienes un pedido pendiente por confirmar." },
 ]
 
-type CampaignStatus = "all" | "completed" | "sending" | "scheduled" | "failed"
-
-type Campaign = (typeof demoCampaigns)[number]
+ 
 
 export default function EnviosMasivosPage() {
   const { contacts, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useContacts()
+  const [campaigns, setCampaigns] = useState<Array<Campaign>>(() => initialCampaigns.map((c) => ({ ...c } as Campaign)))
   const [filter, setFilter] = useState<CampaignStatus>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
@@ -126,12 +140,12 @@ export default function EnviosMasivosPage() {
   const [newTemplate, setNewTemplate] = useState({ name: "", message: "" })
 
   const filteredCampaigns = useMemo(() => {
-    return demoCampaigns.filter((c) => {
+    return campaigns.filter((c) => {
       if (filter !== "all" && c.status !== filter) return false
       if (searchQuery && !c.name.toLowerCase().includes(searchQuery.toLowerCase())) return false
       return true
     })
-  }, [filter, searchQuery])
+  }, [campaigns, filter, searchQuery])
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -206,9 +220,67 @@ export default function EnviosMasivosPage() {
     ])
   }
 
-  const totalSent = demoCampaigns.reduce((acc, c) => acc + c.delivered, 0)
-  const totalRead = demoCampaigns.reduce((acc, c) => acc + c.read, 0)
-  const totalReplied = demoCampaigns.reduce((acc, c) => acc + c.replied, 0)
+  const totalSent = campaigns.reduce((acc, c) => acc + c.delivered, 0)
+  const totalRead = campaigns.reduce((acc, c) => acc + c.read, 0)
+  const totalReplied = campaigns.reduce((acc, c) => acc + c.replied, 0)
+
+  const handleCreateCampaign = (mode: "send" | "schedule") => {
+    const name = newCampaign.name.trim()
+    const message = newCampaign.message.trim()
+
+    if (!name) {
+      toast({ title: "Falta el nombre", description: "Escribe un nombre para la campaña.", variant: "destructive" })
+      return
+    }
+    if (!message) {
+      toast({ title: "Falta el mensaje", description: "Escribe el mensaje que se enviará.", variant: "destructive" })
+      return
+    }
+    if (selectedContacts.length === 0) {
+      toast({ title: "Sin destinatarios", description: "Selecciona al menos un contacto.", variant: "destructive" })
+      return
+    }
+
+    if (mode === "schedule") {
+      if (!newCampaign.scheduleDate) {
+        toast({ title: "Falta la fecha", description: "Selecciona una fecha para programar.", variant: "destructive" })
+        return
+      }
+      if (!newCampaign.scheduleTime) {
+        toast({ title: "Falta la hora", description: "Selecciona una hora para programar.", variant: "destructive" })
+        return
+      }
+    }
+
+    const today = new Date().toISOString().slice(0, 10)
+    const date = mode === "schedule" ? newCampaign.scheduleDate : today
+    const status: Campaign["status"] = mode === "schedule" ? "scheduled" : "sending"
+
+    const created: Campaign = {
+      id: String(Date.now()),
+      name,
+      status,
+      recipients: selectedContacts.length,
+      delivered: 0,
+      read: 0,
+      replied: 0,
+      date,
+      message,
+    }
+
+    setCampaigns((prev) => [created, ...prev])
+    setShowNewDialog(false)
+    setSelectedContacts([])
+    setNewCampaign({ name: "", message: "", scheduleDate: "", scheduleTime: "" })
+
+    toast({
+      title: mode === "schedule" ? "Campaña programada" : "Campaña creada",
+      description:
+        mode === "schedule"
+          ? `Se programó para ${created.date} ${newCampaign.scheduleTime}.`
+          : `Se creó el envío para ${created.recipients} destinatarios.`,
+    })
+  }
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden">
@@ -222,7 +294,7 @@ export default function EnviosMasivosPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Campañas Activas</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {demoCampaigns.filter((c) => c.status === "sending").length}
+                    {campaigns.filter((c) => c.status === "sending").length}
                   </p>
                 </div>
                 <Send className="h-8 w-8 text-primary opacity-50" />
@@ -422,12 +494,12 @@ export default function EnviosMasivosPage() {
                           Cancelar
                         </Button>
                         {newCampaign.scheduleDate ? (
-                          <Button className="gap-1" type="button">
+                          <Button className="gap-1" type="button" onClick={() => handleCreateCampaign("schedule")}>
                             <Calendar className="h-4 w-4" />
                             Programar
                           </Button>
                         ) : (
-                          <Button className="gap-1" type="button">
+                          <Button className="gap-1" type="button" onClick={() => handleCreateCampaign("send")}>
                             <Send className="h-4 w-4" />
                             Enviar ahora
                           </Button>
