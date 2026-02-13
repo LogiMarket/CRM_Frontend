@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
 import { Textarea } from "@/components/ui/textarea"
 import { Checkbox } from "@/components/ui/checkbox"
+import { useContacts } from "@/hooks/use-contacts"
+import { formatContactDisplayName } from "@/lib/utils"
 import {
   Dialog,
   DialogContent,
@@ -91,15 +93,6 @@ const demoCampaigns = [
   },
 ] as const
 
-const demoContacts = [
-  { id: "1", name: "Ana Martínez", phone: "+521 555 123 4567", tags: ["cliente", "vip"] },
-  { id: "2", name: "Roberto Pérez", phone: "+521 555 234 5678", tags: ["cliente"] },
-  { id: "3", name: "Laura Hernández", phone: "+521 555 345 6789", tags: ["prospecto"] },
-  { id: "4", name: "Carlos García", phone: "+521 555 456 7890", tags: ["cliente", "mayorista"] },
-  { id: "5", name: "María López", phone: "+521 555 567 8901", tags: ["prospecto"] },
-  { id: "6", name: "Juan Rodríguez", phone: "+521 555 678 9012", tags: ["cliente"] },
-] as const
-
 type Template = { id: string; name: string; message: string }
 
 const demoTemplates: Template[] = [
@@ -114,6 +107,7 @@ type CampaignStatus = "all" | "completed" | "sending" | "scheduled" | "failed"
 type Campaign = (typeof demoCampaigns)[number]
 
 export default function EnviosMasivosPage() {
+  const { contacts, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useContacts()
   const [filter, setFilter] = useState<CampaignStatus>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
@@ -174,10 +168,10 @@ export default function EnviosMasivosPage() {
   }
 
   const selectAllContacts = () => {
-    if (selectedContacts.length === demoContacts.length) {
+    if (selectedContacts.length === contacts.length) {
       setSelectedContacts([])
     } else {
-      setSelectedContacts(demoContacts.map((c) => c.id))
+      setSelectedContacts(contacts.map((c) => String(c.id)))
     }
   }
 
@@ -350,33 +344,57 @@ export default function EnviosMasivosPage() {
                           <div className="p-2 border-b bg-muted/50 sticky top-0">
                             <div className="flex items-center gap-2">
                               <Checkbox
-                                checked={selectedContacts.length === demoContacts.length}
+                                checked={contacts.length > 0 && selectedContacts.length === contacts.length}
                                 onCheckedChange={selectAllContacts}
                               />
                               <span className="text-sm">Seleccionar todos</span>
                             </div>
                           </div>
 
-                          {demoContacts.map((contact) => (
-                            <div
-                              key={contact.id}
-                              className="flex items-center gap-2 p-2 hover:bg-muted/50 cursor-pointer"
-                              onClick={() => toggleContact(contact.id)}
-                            >
-                              <Checkbox checked={selectedContacts.includes(contact.id)} />
-                              <div className="flex-1">
-                                <p className="text-sm font-medium">{contact.name}</p>
-                                <p className="text-xs text-muted-foreground">{contact.phone}</p>
-                              </div>
-                              <div className="flex gap-1">
-                                {contact.tags.map((tag) => (
-                                  <Badge key={tag} variant="outline" className="text-xs">
-                                    {tag}
-                                  </Badge>
-                                ))}
-                              </div>
+                          {contactsLoading ? (
+                            <div className="p-3 text-sm text-muted-foreground">Cargando contactos...</div>
+                          ) : contactsError ? (
+                            <div className="p-3">
+                              <p className="text-sm text-red-500">{contactsError}</p>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="mt-2 bg-transparent"
+                                onClick={() => void refetchContacts()}
+                                type="button"
+                              >
+                                Reintentar
+                              </Button>
                             </div>
-                          ))}
+                          ) : contacts.length === 0 ? (
+                            <div className="p-3 text-sm text-muted-foreground">No hay contactos para seleccionar.</div>
+                          ) : (
+                            contacts.map((contact) => {
+                              const channel = String(contact.channel || "whatsapp")
+                              const primary = formatContactDisplayName(contact.name || contact.phone_number || contact.external_user_id || "", channel)
+                              const secondaryRaw = channel === "facebook" ? (contact.external_user_id || "") : (contact.phone_number || "")
+                              const secondary = formatContactDisplayName(secondaryRaw, channel)
+                              const id = String(contact.id)
+                              const checked = selectedContacts.includes(id)
+
+                              return (
+                                <div
+                                  key={id}
+                                  className="flex items-center gap-2 p-2 hover:bg-muted/50 cursor-pointer"
+                                  onClick={() => toggleContact(id)}
+                                >
+                                  <Checkbox checked={checked} />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium truncate">{primary || "Contacto"}</p>
+                                    <p className="text-xs text-muted-foreground truncate">{secondary}</p>
+                                  </div>
+                                  <Badge variant="outline" className="text-xs">
+                                    {channel === "facebook" ? "Facebook" : "WhatsApp"}
+                                  </Badge>
+                                </div>
+                              )
+                            })
+                          )}
                         </div>
                       </div>
 
