@@ -161,7 +161,7 @@ export function ContactsList({ selectedId, onSelect, onChat, headerRight, onDele
 
   return (
     <div className="h-full p-3 pr-4">
-      <div className="h-full rounded-xl border bg-card shadow-sm overflow-hidden">
+      <div className="h-full rounded-xl border bg-card shadow-sm overflow-hidden flex flex-col">
         <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
           <div>
             <p className="text-sm font-semibold">Contactos</p>
@@ -191,7 +191,7 @@ export function ContactsList({ selectedId, onSelect, onChat, headerRight, onDele
           )}
         </div>
 
-        <ScrollArea className="h-[calc(100%-112px)]">
+        <ScrollArea className="flex-1">
           <div className="space-y-2 p-3 pr-4">
             {filteredContacts.length === 0 ? (
               <div className="rounded-lg border bg-background p-4 text-center text-sm text-muted-foreground">

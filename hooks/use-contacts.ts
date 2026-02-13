@@ -22,6 +22,7 @@ export function useContacts() {
       const res = await fetch("/api/contacts")
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || `Failed to fetch contacts: ${res.status}`)
+      if (data === null) throw new Error("Invalid response from /api/contacts")
 
       const list = Array.isArray(data) ? data : (data?.contacts || [])
       setContacts(list)
