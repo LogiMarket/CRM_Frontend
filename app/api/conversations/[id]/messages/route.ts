@@ -5,6 +5,10 @@ import { DEMO_MESSAGES } from "@/lib/demo-data"
 
 const demoMessagesStore = [...DEMO_MESSAGES]
 
+function normalizeWhatsappToDigits(value: string) {
+  return String(value || "").replace(/^whatsapp:/i, "").replace(/\D/g, "")
+}
+
 export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getSession()
@@ -276,6 +280,117 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       })
     }
 
+    // Fetch delivery info (best-effort across schemas)
+    let delivery: { channel: string; phoneNumber: string | null } = { channel: "whatsapp", phoneNumber: null }
+    try {
+      const rows: any[] = await sql!`
+        SELECT
+          COALESCE(conv.channel, c.channel, 'whatsapp') as channel,
+          c.phone_number
+        FROM conversations conv
+        LEFT JOIN contacts c ON conv.contact_id = c.id
+        WHERE conv.id::text = ${id}
+        LIMIT 1
+      `
+      delivery = {
+        channel: String(rows?.[0]?.channel || "whatsapp").toLowerCase(),
+        phoneNumber: rows?.[0]?.phone_number ? String(rows[0].phone_number) : null,
+      }
+    } catch {
+      // Older schemas may not have conversations.channel / contacts.channel
+      try {
+        const rows: any[] = await sql!`
+          SELECT c.phone_number
+          FROM conversations conv
+          LEFT JOIN contacts c ON conv.contact_id = c.id
+          WHERE conv.id::text = ${id}
+          LIMIT 1
+        `
+        delivery = { channel: "whatsapp", phoneNumber: rows?.[0]?.phone_number ? String(rows[0].phone_number) : null }
+      } catch {
+        delivery = { channel: "whatsapp", phoneNumber: null }
+      }
+    }
+
+    // Deliver message externally (WhatsApp) BEFORE inserting into DB so UI doesn't show false success
+    if (delivery.channel !== "facebook") {
+      const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL
+
+      // If a backend is configured, keep forwarding (legacy)
+      if (backendUrl && user.id) {
+        try {
+          if (delivery.phoneNumber) {
+            const sessionToken = request.headers.get("authorization") || ""
+            const sendResponse = await fetch(`${backendUrl}/api/whatsapp/send`, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: sessionToken,
+              },
+              body: JSON.stringify({
+                phone_number: delivery.phoneNumber,
+                message: content,
+              }),
+            })
+
+            const sendData = await sendResponse.json().catch(() => null)
+            if (!sendResponse.ok) {
+              return NextResponse.json(
+                { error: "Failed to send WhatsApp message", details: sendData },
+                { status: sendResponse.status || 502 },
+              )
+            }
+          } else {
+            return NextResponse.json({ error: "Recipient phone missing" }, { status: 400 })
+          }
+        } catch (forwardError) {
+          console.error("[POST messages] Forward to backend failed:", forwardError)
+          return NextResponse.json({ error: "Failed to send WhatsApp message" }, { status: 502 })
+        }
+      } else {
+        // Direct Cloud API send
+        const accessToken = process.env.WHATSAPP_ACCESS_TOKEN
+        const phoneNumberId = process.env.WHATSAPP_PHONE_NUMBER_ID
+        if (!accessToken || !phoneNumberId) {
+          return NextResponse.json(
+            { error: "WhatsApp not configured", hint: "Set WHATSAPP_ACCESS_TOKEN and WHATSAPP_PHONE_NUMBER_ID" },
+            { status: 500 },
+          )
+        }
+
+        if (!delivery.phoneNumber) {
+          return NextResponse.json({ error: "Recipient phone missing" }, { status: 400 })
+        }
+
+        const to = normalizeWhatsappToDigits(delivery.phoneNumber)
+        if (!to) {
+          return NextResponse.json({ error: "Recipient phone invalid" }, { status: 400 })
+        }
+
+        const waRes = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(phoneNumberId)}/messages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({
+            messaging_product: "whatsapp",
+            to,
+            type: "text",
+            text: { body: content },
+          }),
+        })
+
+        const waData = await waRes.json().catch(() => null)
+        if (!waRes.ok) {
+          return NextResponse.json(
+            { error: waData?.error?.message || "Failed to send WhatsApp message", details: waData },
+            { status: waRes.status || 502 },
+          )
+        }
+      }
+    }
+
     // Try to insert message - handle both UUID and integer conversation_id
     let message = null
     try {
@@ -311,47 +426,6 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       `
     } catch (updateError) {
       console.error("[POST messages] Update failed (not critical):", updateError)
-    }
-
-    // Optional: forward message to external backend (WhatsApp sender)
-    const backendUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL
-    if (backendUrl && user.id) {
-      try {
-        // Get conversation contact phone number for WhatsApp sending
-        const conversation = await sql`
-          SELECT c.phone_number FROM conversations conv
-          LEFT JOIN contacts c ON conv.contact_id = c.id
-          WHERE conv.id::text = ${id}
-          LIMIT 1
-        `
-        
-        if (conversation && conversation[0] && conversation[0].phone_number) {
-          const phoneNumber = conversation[0].phone_number
-          console.log("[POST messages] Forwarding to WhatsApp:", { phoneNumber, content })
-          
-          // Get JWT token to authenticate with backend
-          const sessionToken = request.headers.get('authorization') || ''
-          
-          const sendResponse = await fetch(`${backendUrl}/api/whatsapp/send`, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "Authorization": sessionToken
-            },
-            body: JSON.stringify({ 
-              phone_number: phoneNumber,
-              message: content
-            }),
-          })
-          
-          const sendData = await sendResponse.json()
-          console.log("[POST messages] WhatsApp send response:", { status: sendResponse.status, data: sendData })
-        } else {
-          console.warn("[POST messages] No phone number found for conversation", { id })
-        }
-      } catch (forwardError) {
-        console.error("[POST messages] Forward to backend failed (non-blocking):", forwardError)
-      }
     }
 
     return NextResponse.json({
