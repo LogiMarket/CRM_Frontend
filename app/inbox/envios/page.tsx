@@ -1,6 +1,6 @@
 "use client"
 
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { InboxHeader } from "@/components/inbox-header"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
@@ -110,6 +110,63 @@ const initialCampaigns: Campaign[] = [
 
 type Template = { id: string; name: string; message: string }
 
+type ScheduledBulkJob = {
+  id: string
+  name: string
+  scheduledAt: string // ISO
+  contactIds: string[]
+  message: string
+  whatsappTemplate: null | { name: string; language: string; bodyParams: string[] }
+}
+
+const SCHEDULED_JOBS_STORAGE_KEY = "bulkScheduledJobs"
+
+function buildScheduledAt(date: string, time: string) {
+  const d = String(date || "").trim()
+  const t = String(time || "").trim()
+  if (!d || !t) return null
+  const dt = new Date(`${d}T${t}:00`)
+  if (Number.isNaN(dt.getTime())) return null
+  return dt
+}
+
+function loadScheduledJobs(): ScheduledBulkJob[] {
+  try {
+    const raw = window.localStorage.getItem(SCHEDULED_JOBS_STORAGE_KEY)
+    if (!raw) return []
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .map((j) => ({
+        id: String(j?.id || ""),
+        name: String(j?.name || ""),
+        scheduledAt: String(j?.scheduledAt || ""),
+        contactIds: Array.isArray(j?.contactIds) ? j.contactIds.map((x: any) => String(x)) : [],
+        message: String(j?.message || ""),
+        whatsappTemplate: j?.whatsappTemplate && typeof j.whatsappTemplate === "object"
+          ? {
+              name: String(j.whatsappTemplate?.name || ""),
+              language: String(j.whatsappTemplate?.language || ""),
+              bodyParams: Array.isArray(j.whatsappTemplate?.bodyParams)
+                ? j.whatsappTemplate.bodyParams.map((x: any) => String(x))
+                : [],
+            }
+          : null,
+      }))
+      .filter((j) => j.id && j.scheduledAt && j.contactIds.length > 0 && j.message)
+  } catch {
+    return []
+  }
+}
+
+function saveScheduledJobs(jobs: ScheduledBulkJob[]) {
+  try {
+    window.localStorage.setItem(SCHEDULED_JOBS_STORAGE_KEY, JSON.stringify(jobs))
+  } catch {
+    // ignore
+  }
+}
+
 const demoTemplates: Template[] = [
   { id: "1", name: "Bienvenida", message: "Hola {{nombre}}! Bienvenido a LogiMarket. Estamos para servirte." },
   { id: "2", name: "Seguimiento", message: "Hola {{nombre}}, queremos saber cómo fue tu experiencia con tu pedido #{{pedido}}." },
@@ -126,6 +183,8 @@ export default function EnviosMasivosPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
   const [sendingBulk, setSendingBulk] = useState(false)
+  const [scheduledJobs, setScheduledJobs] = useState<ScheduledBulkJob[]>([])
+  const scheduledTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
   const [newCampaign, setNewCampaign] = useState({
     name: "",
     message: "",
@@ -228,6 +287,90 @@ export default function EnviosMasivosPage() {
   const totalRead = campaigns.reduce((acc, c) => acc + c.read, 0)
   const totalReplied = campaigns.reduce((acc, c) => acc + c.replied, 0)
 
+  useEffect(() => {
+    setScheduledJobs(loadScheduledJobs())
+  }, [])
+
+  useEffect(() => {
+    saveScheduledJobs(scheduledJobs)
+
+    // Reset timers
+    Object.values(scheduledTimersRef.current).forEach((t) => clearTimeout(t))
+    scheduledTimersRef.current = {}
+
+    // Schedule execution (requires the UI to be open)
+    for (const job of scheduledJobs) {
+      const when = new Date(job.scheduledAt)
+      const ms = when.getTime() - Date.now()
+      if (Number.isNaN(when.getTime())) continue
+      if (ms <= 0) continue
+
+      scheduledTimersRef.current[job.id] = setTimeout(() => {
+        void runScheduledJob(job.id)
+      }, ms)
+    }
+  }, [scheduledJobs])
+
+  const runScheduledJob = async (jobId: string) => {
+    const job = scheduledJobs.find((j) => j.id === jobId)
+    if (!job) return
+
+    setCampaigns((prev) => prev.map((c) => (c.id === jobId ? { ...c, status: "sending" } : c)))
+
+    try {
+      const res = await fetch("/api/campaigns/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ contactIds: job.contactIds, message: job.message, whatsappTemplate: job.whatsappTemplate }),
+      })
+
+      const data = await res.json().catch(() => null)
+      if (!res.ok) {
+        setCampaigns((prev) => prev.map((c) => (c.id === jobId ? { ...c, status: "failed" } : c)))
+        toast({ title: "Error", description: data?.error || "No se pudo ejecutar la campaña programada", variant: "destructive" })
+        return
+      }
+
+      const sent = Number(data?.sent || 0)
+      const failed = Number(data?.failed || 0)
+      const total = Number(data?.total || job.contactIds.length)
+
+      setCampaigns((prev) =>
+        prev.map((c) =>
+          c.id === jobId
+            ? {
+                ...c,
+                status: failed === 0 ? "completed" : sent > 0 ? "completed" : "failed",
+                recipients: total,
+                delivered: sent,
+              }
+            : c,
+        ),
+      )
+
+      if (failed > 0) {
+        toast({
+          title: "Campaña ejecutada (parcial)",
+          description: `Enviados: ${sent}. Fallidos: ${failed}. Total: ${total}.`,
+          variant: "destructive",
+        })
+      } else {
+        toast({ title: "Campaña ejecutada", description: `Enviados ${sent} mensajes.` })
+      }
+    } catch (e) {
+      setCampaigns((prev) => prev.map((c) => (c.id === jobId ? { ...c, status: "failed" } : c)))
+      toast({ title: "Error", description: e instanceof Error ? e.message : "No se pudo ejecutar la campaña programada", variant: "destructive" })
+    } finally {
+      setScheduledJobs((prev) => prev.filter((j) => j.id !== jobId))
+    }
+  }
+
+  const cancelScheduledJob = (jobId: string) => {
+    setScheduledJobs((prev) => prev.filter((j) => j.id !== jobId))
+    setCampaigns((prev) => prev.map((c) => (c.id === jobId ? { ...c, status: "failed" } : c)))
+    toast({ title: "Envío cancelado", description: "La campaña programada fue cancelada." })
+  }
+
   const handleCreateCampaign = async (mode: "send" | "schedule") => {
     const name = newCampaign.name.trim()
     const messageTemplate = newCampaign.message.trim()
@@ -245,28 +388,79 @@ export default function EnviosMasivosPage() {
       return
     }
 
+    const whatsappTemplateName = newCampaign.whatsappTemplateName.trim()
+    const whatsappTemplateLanguage = newCampaign.whatsappTemplateLanguage.trim()
+    const bodyParams = newCampaign.whatsappTemplateBodyParams
+      .split(/\r?\n|,/g)
+      .map((x) => x.trim())
+      .filter(Boolean)
+
+    const whatsappTemplate = whatsappTemplateName && whatsappTemplateLanguage
+      ? { name: whatsappTemplateName, language: whatsappTemplateLanguage, bodyParams }
+      : null
+
     if (mode === "schedule") {
+      if (!newCampaign.scheduleDate) {
+        toast({ title: "Falta la fecha", description: "Selecciona una fecha para programar.", variant: "destructive" })
+        return
+      }
+      if (!newCampaign.scheduleTime) {
+        toast({ title: "Falta la hora", description: "Selecciona una hora para programar.", variant: "destructive" })
+        return
+      }
+
+      const scheduledAt = buildScheduledAt(newCampaign.scheduleDate, newCampaign.scheduleTime)
+      if (!scheduledAt) {
+        toast({ title: "Fecha inválida", description: "Revisa la fecha y hora seleccionadas.", variant: "destructive" })
+        return
+      }
+
+      const created: Campaign = {
+        id: String(Date.now()),
+        name,
+        status: "scheduled",
+        recipients: selectedContacts.length,
+        delivered: 0,
+        read: 0,
+        replied: 0,
+        date: `${newCampaign.scheduleDate} ${newCampaign.scheduleTime}`,
+        message: messageTemplate,
+      }
+
+      setCampaigns((prev) => [created, ...prev])
+      setScheduledJobs((prev) => [
+        ...prev,
+        {
+          id: created.id,
+          name: created.name,
+          scheduledAt: scheduledAt.toISOString(),
+          contactIds: [...selectedContacts],
+          message: messageTemplate,
+          whatsappTemplate,
+        },
+      ])
+
+      setShowNewDialog(false)
+      setSelectedContacts([])
+      setNewCampaign({
+        name: "",
+        message: "",
+        whatsappTemplateName: "",
+        whatsappTemplateLanguage: "",
+        whatsappTemplateBodyParams: "",
+        scheduleDate: "",
+        scheduleTime: "",
+      })
+
       toast({
-        title: "Programación pendiente",
-        description: "Para programar envíos reales se necesita un job/cron en el servidor. Por ahora solo está disponible 'Enviar ahora'.",
-        variant: "destructive",
+        title: "Campaña programada",
+        description: `Se programó para ${created.date}. (Requiere dejar abierto este panel o configurar un cron en servidor)` ,
       })
       return
     }
 
     try {
       setSendingBulk(true)
-
-      const whatsappTemplateName = newCampaign.whatsappTemplateName.trim()
-      const whatsappTemplateLanguage = newCampaign.whatsappTemplateLanguage.trim()
-      const bodyParams = newCampaign.whatsappTemplateBodyParams
-        .split(/\r?\n|,/g)
-        .map((x) => x.trim())
-        .filter(Boolean)
-
-      const whatsappTemplate = whatsappTemplateName && whatsappTemplateLanguage
-        ? { name: whatsappTemplateName, language: whatsappTemplateLanguage, bodyParams }
-        : null
 
       const res = await fetch("/api/campaigns/send", {
         method: "POST",
@@ -929,13 +1123,33 @@ export default function EnviosMasivosPage() {
 
               <div className="flex justify-end gap-2 pt-4 border-t">
                 {previewCampaign.status === "scheduled" && (
-                  <Button variant="outline" className="text-red-600 bg-transparent" type="button">
+                  <Button
+                    variant="outline"
+                    className="text-red-600 bg-transparent"
+                    type="button"
+                    onClick={() => {
+                      cancelScheduledJob(previewCampaign.id)
+                      setShowPreviewDialog(false)
+                    }}
+                  >
                     Cancelar envío
                   </Button>
                 )}
                 <Button variant="outline" onClick={() => setShowPreviewDialog(false)} type="button">
                   Cerrar
                 </Button>
+                {previewCampaign.status === "scheduled" && (
+                  <Button
+                    type="button"
+                    onClick={() => {
+                      void runScheduledJob(previewCampaign.id)
+                      setShowPreviewDialog(false)
+                    }}
+                  >
+                    <Send className="h-4 w-4 mr-1" />
+                    Enviar ahora
+                  </Button>
+                )}
                 {previewCampaign.status === "completed" && (
                   <Button type="button">
                     <Copy className="h-4 w-4 mr-1" />
