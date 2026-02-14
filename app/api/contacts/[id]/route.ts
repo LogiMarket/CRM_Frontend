@@ -68,7 +68,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
     const externalRaw = String(body?.external_user_id ?? "").trim()
 
     if (isDemoMode) {
-      return NextResponse.json({ ok: true, demo: true })
+      return NextResponse.json(
+        { ok: true, demo: true },
+        { headers: { "Cache-Control": "no-store, max-age=0" } },
+      )
     }
 
     const includeChannelCols = await hasContactChannelColumns()
@@ -115,7 +118,10 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ id
           RETURNING id, name, phone_number, avatar_url, NULL::varchar as channel, NULL::varchar as external_user_id, created_at
         `
 
-    return NextResponse.json({ contact: updated?.[0] || null })
+    return NextResponse.json(
+      { contact: updated?.[0] || null },
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
+    )
   } catch (error) {
     console.error("[Contacts PATCH] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
@@ -137,7 +143,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     if (!idText) return NextResponse.json({ error: "Contact ID required" }, { status: 400 })
 
     if (isDemoMode) {
-      return NextResponse.json({ ok: true, deleted: idText, demo: true })
+      return NextResponse.json(
+        { ok: true, deleted: idText, demo: true },
+        { headers: { "Cache-Control": "no-store, max-age=0" } },
+      )
     }
 
     const deleted = await sql.begin(async (tx) => {
@@ -188,7 +197,10 @@ export async function DELETE(request: Request, { params }: { params: Promise<{ i
     })
 
     if (!deleted) return NextResponse.json({ error: "Contact not found" }, { status: 404 })
-    return NextResponse.json({ ok: true, deleted })
+    return NextResponse.json(
+      { ok: true, deleted },
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
+    )
   } catch (error: any) {
     console.error("[Contacts DELETE] Error:", error)
 

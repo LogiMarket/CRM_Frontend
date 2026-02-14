@@ -19,7 +19,7 @@ export function useContacts() {
 
   const fetchContacts = useCallback(async () => {
     try {
-      const res = await fetch("/api/contacts")
+      const res = await fetch("/api/contacts", { cache: "no-store" })
       const data = await res.json().catch(() => null)
       if (!res.ok) throw new Error(data?.error || `Failed to fetch contacts: ${res.status}`)
       if (data === null) throw new Error("Invalid response from /api/contacts")

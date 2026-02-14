@@ -32,7 +32,10 @@ export async function GET() {
     if (!user) return NextResponse.json({ error: "Not authenticated" }, { status: 401 })
 
     if (isDemoMode) {
-      return NextResponse.json({ contacts: DEMO_CONTACTS })
+      return NextResponse.json(
+        { contacts: DEMO_CONTACTS },
+        { headers: { "Cache-Control": "no-store, max-age=0" } },
+      )
     }
 
     const includeChannelCols = await hasContactChannelColumns()
@@ -51,7 +54,10 @@ export async function GET() {
           LIMIT 200
         `
 
-    return NextResponse.json({ contacts: rows || [] })
+    return NextResponse.json(
+      { contacts: rows || [] },
+      { headers: { "Cache-Control": "no-store, max-age=0" } },
+    )
   } catch (error) {
     console.error("[Contacts GET] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
