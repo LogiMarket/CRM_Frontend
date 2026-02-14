@@ -50,6 +50,23 @@ function parseBooleanish(value: any, fallback: boolean) {
   return fallback
 }
 
+function normalizeTemplateLanguageCode(value: string) {
+  const raw = String(value || "").trim()
+  if (!raw) return ""
+
+  // Common variants -> Meta format
+  const v = raw.replace(/-/g, "_")
+
+  // Known mistake: es_MEX is not a valid WhatsApp template language code.
+  if (v.toLowerCase() === "es_mex") return "es_MX"
+
+  // Normalize casing: ll_CC (language lower, region upper)
+  const parts = v.split("_").filter(Boolean)
+  if (parts.length === 1) return parts[0].toLowerCase()
+  const [lang, region] = parts
+  return `${String(lang).toLowerCase()}_${String(region).toUpperCase()}`
+}
+
 async function ensureWebhookLogsTable(db: Db) {
   try {
     await db`
@@ -669,7 +686,7 @@ export async function POST(request: Request) {
     const whatsappTemplate: WhatsappTemplateSpec | null = body?.whatsappTemplate
       ? {
           name: String(body.whatsappTemplate?.name || "").trim(),
-          language: String(body.whatsappTemplate?.language || "").trim(),
+          language: normalizeTemplateLanguageCode(String(body.whatsappTemplate?.language || "")),
           bodyParams: Array.isArray(body.whatsappTemplate?.bodyParams)
             ? body.whatsappTemplate.bodyParams.map((x: any) => String(x ?? "")).filter((x: string) => x.trim().length > 0)
             : [],
