@@ -140,7 +140,8 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
 
     const name = String(body?.name || "").trim() || "Campaña"
-    const message = String(body?.message || "").trim()
+    const messageRaw = String(body?.message || "")
+    const message = messageRaw.trim()
     const sendMode: SendMode = (String(body?.sendMode || "auto") as SendMode)
     const contactIds = Array.isArray(body?.contactIds) ? body.contactIds.map((x: any) => String(x).trim()).filter(Boolean) : []
 
@@ -157,9 +158,21 @@ export async function POST(request: Request) {
         }
       : null
 
-    if (!message) {
-      return NextResponse.json({ error: "message is required" }, { status: 400 })
+    if (sendMode !== "template") {
+      return NextResponse.json(
+        { error: "Bulk schedule only supports WhatsApp templates (sendMode must be 'template')" },
+        { status: 400 },
+      )
     }
+
+    if (!whatsappTemplate || !whatsappTemplate.name || !whatsappTemplate.language) {
+      return NextResponse.json(
+        { error: "whatsappTemplate (name/language) is required" },
+        { status: 400 },
+      )
+    }
+
+    const persistedMessage = message || `[TEMPLATE:${whatsappTemplate.name} ${whatsappTemplate.language}]`.trim()
     if (!scheduledAt || Number.isNaN(scheduledAt.getTime())) {
       return NextResponse.json({ error: "scheduledAt is required" }, { status: 400 })
     }
@@ -172,9 +185,9 @@ export async function POST(request: Request) {
 
     let campaignId = await createBulkCampaign(db, {
       name,
-      message,
+      message: persistedMessage,
       sendMode,
-      whatsappTemplate: sendMode === "text" ? null : whatsappTemplate,
+      whatsappTemplate,
       total: contactIds.length,
       createdBy: (user as any)?.id,
       scheduledAt,
@@ -188,9 +201,9 @@ export async function POST(request: Request) {
         kind: "campaign",
         id: campaignId,
         name,
-        message,
+        message: persistedMessage,
         sendMode,
-        whatsappTemplate: sendMode === "text" ? null : whatsappTemplate,
+        whatsappTemplate,
         status: "scheduled",
         total: contactIds.length,
         sent: 0,

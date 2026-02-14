@@ -106,8 +106,7 @@ type ScheduledBulkJob = {
   contactIds: string[]
   message: string
   whatsappTemplate: null | { name: string; language: string; bodyParams: string[] }
-  sendMode?: "auto" | "text"
-  skipIfOutside24h?: boolean
+  sendMode?: "template"
 }
 
 const SCHEDULED_JOBS_STORAGE_KEY = "bulkScheduledJobs"
@@ -154,10 +153,9 @@ function loadScheduledJobs(): ScheduledBulkJob[] {
                 : [],
             }
           : null,
-        sendMode: String(j?.sendMode || "auto") === "text" ? "text" : "auto",
-        skipIfOutside24h: parseBooleanish(j?.skipIfOutside24h, true),
+        sendMode: "template" as const,
       }))
-      .filter((j) => j.id && j.scheduledAt && j.contactIds.length > 0 && j.message)
+      .filter((j) => j.id && j.scheduledAt && j.contactIds.length > 0)
   } catch {
     return []
   }
@@ -195,8 +193,7 @@ export default function EnviosMasivosPage() {
     whatsappTemplateName: "",
     whatsappTemplateLanguage: "",
     whatsappTemplateBodyParams: "",
-    sendMode: "text" as "auto" | "text",
-    skipIfOutside24h: true,
+    sendMode: "template" as "template",
     scheduleDate: "",
     scheduleTime: "",
   })
@@ -407,6 +404,10 @@ export default function EnviosMasivosPage() {
       const skipped = Number(data?.skipped || 0)
       const total = Number(data?.total || job.contactIds.length)
 
+      const firstError = Array.isArray(data?.results)
+        ? String((data.results.find((r: any) => r && r.ok === false && !r.skipped)?.error || "") ?? "").trim()
+        : ""
+
       setCampaigns((prev) =>
         prev.map((c) =>
           c.id === jobId
@@ -425,7 +426,7 @@ export default function EnviosMasivosPage() {
       if (failed > 0) {
         toast({
           title: "Campaña ejecutada (parcial)",
-          description: `Enviados: ${sent}. Omitidos: ${skipped}. Fallidos: ${failed}. Total: ${total}.`,
+          description: `${`Enviados: ${sent}. Omitidos: ${skipped}. Fallidos: ${failed}. Total: ${total}.`}${firstError ? ` Primer error: ${firstError}` : ""}`,
           variant: "destructive",
         })
       } else if (skipped > 0) {
@@ -458,10 +459,6 @@ export default function EnviosMasivosPage() {
       toast({ title: "Falta el nombre", description: "Escribe un nombre para la campaña.", variant: "destructive" })
       return
     }
-    if (!messageTemplate) {
-      toast({ title: "Falta el mensaje", description: "Escribe el mensaje que se enviará.", variant: "destructive" })
-      return
-    }
     if (selectedContacts.length === 0) {
       toast({ title: "Sin destinatarios", description: "Selecciona al menos un contacto.", variant: "destructive" })
       return
@@ -474,12 +471,15 @@ export default function EnviosMasivosPage() {
       .map((x) => x.trim())
       .filter(Boolean)
 
-    const sendMode = newCampaign.sendMode
-    const skipIfOutside24h = Boolean(newCampaign.skipIfOutside24h)
-    const whatsappTemplate =
-      sendMode !== "text" && whatsappTemplateName && whatsappTemplateLanguage
-        ? { name: whatsappTemplateName, language: whatsappTemplateLanguage, bodyParams }
-        : null
+    const sendMode = "template" as const
+    const whatsappTemplate = whatsappTemplateName && whatsappTemplateLanguage
+      ? { name: whatsappTemplateName, language: whatsappTemplateLanguage, bodyParams }
+      : null
+
+    if (!whatsappTemplate) {
+      toast({ title: "Falta la plantilla", description: "Para envíos masivos solo se permite WhatsApp Template oficial (name y language).", variant: "destructive" })
+      return
+    }
 
     if (mode === "schedule") {
       if (!newCampaign.scheduleDate) {
@@ -506,7 +506,6 @@ export default function EnviosMasivosPage() {
             name,
             message: messageTemplate,
             sendMode,
-            skipIfOutside24h,
             contactIds: selectedContacts,
             scheduledAt: scheduledAt.toISOString(),
             whatsappTemplate,
@@ -543,7 +542,6 @@ export default function EnviosMasivosPage() {
           message: messageTemplate,
           whatsappTemplate,
           sendMode,
-          skipIfOutside24h,
         },
       ])
 
@@ -555,8 +553,7 @@ export default function EnviosMasivosPage() {
         whatsappTemplateName: "",
         whatsappTemplateLanguage: "",
         whatsappTemplateBodyParams: "",
-        sendMode: "text",
-        skipIfOutside24h: true,
+        sendMode: "template",
         scheduleDate: "",
         scheduleTime: "",
       })
@@ -579,7 +576,6 @@ export default function EnviosMasivosPage() {
           message: messageTemplate,
           whatsappTemplate,
           sendMode,
-          skipIfOutside24h,
           campaignName: name,
         }),
       })
@@ -594,6 +590,10 @@ export default function EnviosMasivosPage() {
       const failed = Number(data?.failed || 0)
       const skipped = Number(data?.skipped || 0)
       const total = Number(data?.total || selectedContacts.length)
+
+      const firstError = Array.isArray(data?.results)
+        ? String((data.results.find((r: any) => r && r.ok === false && !r.skipped)?.error || "") ?? "").trim()
+        : ""
 
       const today = new Date().toISOString().slice(0, 10)
       const created: Campaign = {
@@ -619,8 +619,7 @@ export default function EnviosMasivosPage() {
         whatsappTemplateName: "",
         whatsappTemplateLanguage: "",
         whatsappTemplateBodyParams: "",
-        sendMode: "text",
-        skipIfOutside24h: true,
+        sendMode: "template",
         scheduleDate: "",
         scheduleTime: "",
       })
@@ -628,7 +627,7 @@ export default function EnviosMasivosPage() {
       if (failed > 0) {
         toast({
           title: "Envío parcial",
-          description: `Enviados: ${sent}. Omitidos: ${skipped}. Fallidos: ${failed}. Total: ${total}.`,
+          description: `${`Enviados: ${sent}. Omitidos: ${skipped}. Fallidos: ${failed}. Total: ${total}.`}${firstError ? ` Primer error: ${firstError}` : ""}`,
           variant: "destructive",
         })
       } else if (skipped > 0) {
@@ -780,46 +779,9 @@ export default function EnviosMasivosPage() {
                       <div className="border rounded-lg p-3 space-y-3">
                         <div className="text-sm font-medium">WhatsApp Template oficial (opcional)</div>
 
-                        <div className="flex items-center gap-2">
-                          <Checkbox
-                            checked={newCampaign.sendMode === "text"}
-                            onCheckedChange={(v) => {
-                              const asText = Boolean(v)
-                              setNewCampaign((prev) =>
-                                asText
-                                  ? {
-                                      ...prev,
-                                      sendMode: "text",
-                                      skipIfOutside24h: true,
-                                      whatsappTemplateName: "",
-                                      whatsappTemplateLanguage: "",
-                                      whatsappTemplateBodyParams: "",
-                                    }
-                                  : { ...prev, sendMode: "auto" },
-                              )
-                            }}
-                          />
-                          <div>
-                            <div className="text-sm">Enviar por WhatsApp como texto (sin plantilla)</div>
-                            <div className="text-xs text-muted-foreground">
-                              Nota: fuera de la ventana de 24h WhatsApp puede rechazar texto libre.
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2 pl-6">
-                          <Checkbox
-                            checked={newCampaign.skipIfOutside24h}
-                            disabled={newCampaign.sendMode !== "text"}
-                            onCheckedChange={(v) => setNewCampaign((prev) => ({ ...prev, skipIfOutside24h: Boolean(v) }))}
-                          />
-                          <div>
-                            <div className="text-sm">Omitir contactos fuera de la ventana 24h</div>
-                            <div className="text-xs text-muted-foreground">
-                              Si lo desactivas, se intentará enviar a todos (WhatsApp puede responder error fuera de 24h).
-                            </div>
-                          </div>
-                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          Este módulo está configurado para enviar masivos únicamente con plantillas oficiales de WhatsApp (Meta).
+                        </p>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
@@ -827,7 +789,6 @@ export default function EnviosMasivosPage() {
                             <Input
                               placeholder="Ej: bienvenida_logimarket"
                               value={newCampaign.whatsappTemplateName}
-                              disabled={newCampaign.sendMode === "text"}
                               onChange={(e) =>
                                 setNewCampaign((prev) => ({ ...prev, whatsappTemplateName: e.target.value }))
                               }
@@ -838,7 +799,6 @@ export default function EnviosMasivosPage() {
                             <Input
                               placeholder="Ej: es_MX"
                               value={newCampaign.whatsappTemplateLanguage}
-                              disabled={newCampaign.sendMode === "text"}
                               onChange={(e) =>
                                 setNewCampaign((prev) => ({ ...prev, whatsappTemplateLanguage: e.target.value }))
                               }
@@ -851,7 +811,6 @@ export default function EnviosMasivosPage() {
                             placeholder="Ej:\n{{nombre}}"
                             rows={2}
                             value={newCampaign.whatsappTemplateBodyParams}
-                            disabled={newCampaign.sendMode === "text"}
                             onChange={(e) =>
                               setNewCampaign((prev) => ({ ...prev, whatsappTemplateBodyParams: e.target.value }))
                             }
@@ -865,7 +824,7 @@ export default function EnviosMasivosPage() {
                       <div>
                         <label className="text-sm font-medium mb-1 block">Mensaje</label>
                         <Textarea
-                          placeholder="Escribe tu mensaje aquí. Usa {{nombre}} para personalizar."
+                          placeholder="Opcional: nota interna para esta campaña (no se envía como texto libre a WhatsApp)."
                           rows={4}
                           value={newCampaign.message}
                           onChange={(e) => setNewCampaign((prev) => ({ ...prev, message: e.target.value }))}

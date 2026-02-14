@@ -655,7 +655,8 @@ export async function POST(request: Request) {
 
     const body = await request.json().catch(() => ({}))
     const contactIds = Array.isArray(body?.contactIds) ? body.contactIds.map((x: any) => String(x).trim()).filter(Boolean) : []
-    const messageTemplate = String(body?.message || "").trim()
+    const messageTemplateRaw = String(body?.message || "")
+    const messageTemplate = messageTemplateRaw.trim()
 
     const sendMode: SendMode = (String(body?.sendMode || "auto") as SendMode)
     // Important: only skip when explicitly requested by the client.
@@ -675,11 +676,22 @@ export async function POST(request: Request) {
         }
       : null
 
+    if (sendMode !== "template") {
+      return NextResponse.json(
+        { error: "Bulk send only supports WhatsApp templates (sendMode must be 'template')" },
+        { status: 400 },
+      )
+    }
+
+    if (!whatsappTemplate || !whatsappTemplate.name || !whatsappTemplate.language) {
+      return NextResponse.json(
+        { error: "whatsappTemplate (name/language) is required for bulk template sends" },
+        { status: 400 },
+      )
+    }
+
     if (!contactIds.length) {
       return NextResponse.json({ error: "contactIds is required" }, { status: 400 })
-    }
-    if (!messageTemplate) {
-      return NextResponse.json({ error: "message is required" }, { status: 400 })
     }
 
     const db = sql
@@ -756,80 +768,54 @@ export async function POST(request: Request) {
         const conversationId = String(ensured.conversation.id)
         const channel = ensured.channel === "facebook" ? "facebook" : "whatsapp"
 
-        const renderedContent = renderMessageTemplate(messageTemplate, ensured.contact)
-
-        const shouldSendWhatsappTemplate =
-          sendMode !== "text" &&
-          channel === "whatsapp" &&
-          !!whatsappTemplate &&
-          !!whatsappTemplate.name &&
-          !!whatsappTemplate.language
-
-        const shouldSendWhatsappText = channel === "whatsapp" && (sendMode === "text" || !shouldSendWhatsappTemplate)
+        const renderedBodyParams = (whatsappTemplate?.bodyParams || []).map((p) => renderMessageTemplate(p, ensured.contact))
+        const synthesizedContent =
+          messageTemplate ||
+          `[TEMPLATE:${whatsappTemplate.name} ${whatsappTemplate.language}] ${renderedBodyParams.join(" | ")}`.trim()
 
         let sendRes:
           | { ok: true; externalMessageId: string | null }
           | { ok: false; error: string; details?: any }
 
-        if (channel === "facebook") {
-          const recipientId = String(ensured.externalUserId || "").trim()
-          if (!recipientId) {
-            results.push({ contactId: contactIdText, conversationId, channel, ok: false, error: "external_user_id (PSID) missing" })
-            continue
-          }
-          sendRes = await sendFacebookText(renderedContent, recipientId)
-        } else {
+        if (channel !== "whatsapp") {
+          await insertOutboundMessage(db, {
+            conversationId,
+            userId: (user as any).id,
+            content: synthesizedContent,
+            metadata: {
+              campaignId,
+              campaignName,
+              source: "bulk",
+              send: {
+                ok: false,
+                skipped: false,
+                externalMessageId: null,
+                error: "Solo se soporta WhatsApp Templates para envíos masivos",
+              },
+            },
+          })
+
+          results.push({
+            contactId: contactIdText,
+            conversationId,
+            channel,
+            sendType: "template",
+            ok: false,
+            externalMessageId: null,
+            error: "Solo se soporta WhatsApp Templates para envíos masivos",
+          })
+          continue
+        }
+
           const phoneNumber = String((ensured.contact as any)?.phone_number || "").trim()
 
-          if (shouldSendWhatsappText && skipIfOutside24h) {
-            const lastInboundAt = await getLastInboundAt(db, conversationId, hasMessagesDirection)
-            const msSinceInbound = lastInboundAt ? Date.now() - lastInboundAt.getTime() : Number.POSITIVE_INFINITY
-            const within24h = msSinceInbound >= 0 && msSinceInbound <= 24 * 60 * 60 * 1000
-            if (!within24h) {
-              // Save an outbound attempt marked as skipped so stats/UI can reflect it.
-              await insertOutboundMessage(db, {
-                conversationId,
-                userId: (user as any).id,
-                content: renderedContent,
-                metadata: {
-                  campaignId,
-                  campaignName,
-                  source: "bulk",
-                  send: {
-                    ok: false,
-                    skipped: true,
-                    externalMessageId: null,
-                    error: "Fuera de ventana 24h: WhatsApp requiere una plantilla (template) aprobada",
-                  },
-                },
-              })
-
-              results.push({
-                contactId: contactIdText,
-                conversationId,
-                channel,
-                sendType: "text",
-                ok: false,
-                skipped: true,
-                error: "Fuera de ventana 24h: WhatsApp requiere una plantilla (template) aprobada para este envío",
-              })
-              continue
-            }
-          }
-
-          if (shouldSendWhatsappTemplate) {
-            const renderedBodyParams = (whatsappTemplate?.bodyParams || []).map((p) => renderMessageTemplate(p, ensured.contact))
-            sendRes = await sendWhatsappTemplate(whatsappTemplate!, phoneNumber, renderedBodyParams)
-          } else {
-            sendRes = await sendWhatsappText(renderedContent, phoneNumber)
-          }
-        }
+        sendRes = await sendWhatsappTemplate(whatsappTemplate!, phoneNumber, renderedBodyParams)
 
         // Save message in DB regardless of send result (so UI shows what was attempted)
         const inserted = await insertOutboundMessage(db, {
           conversationId,
           userId: (user as any).id,
-          content: renderedContent,
+          content: synthesizedContent,
           metadata: {
             campaignId,
             campaignName,
@@ -896,8 +882,9 @@ export async function POST(request: Request) {
           contactId: contactIdText,
           conversationId,
           channel,
-          sendType: channel === "whatsapp" && shouldSendWhatsappTemplate ? "template" : "text",
+          sendType: "template",
           ok: sendRes.ok,
+          externalMessageId: sendRes.ok ? sendRes.externalMessageId : null,
           error:
             sendRes.ok
               ? null
