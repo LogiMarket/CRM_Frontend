@@ -5,6 +5,7 @@ import crypto from "crypto"
 export const runtime = "nodejs"
 
 let _hasMessagesReadAtColumn: boolean | null = null
+let _hasMessagesExternalMessageIdColumn: boolean | null = null
 
 async function hasMessagesReadAtColumn(): Promise<boolean> {
   if (_hasMessagesReadAtColumn !== null) return _hasMessagesReadAtColumn
@@ -355,6 +356,23 @@ function normalizePhoneNumber(value: string) {
   return String(value).replace("whatsapp:", "").replace(/\D/g, "")
 }
 
+async function hasMessagesExternalMessageIdColumn(): Promise<boolean> {
+  if (_hasMessagesExternalMessageIdColumn !== null) return _hasMessagesExternalMessageIdColumn
+  try {
+    const rows: any[] = await sql!`
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'messages'
+        AND column_name = 'external_message_id'
+      LIMIT 1
+    `
+    _hasMessagesExternalMessageIdColumn = Array.isArray(rows) && rows.length > 0
+  } catch {
+    _hasMessagesExternalMessageIdColumn = false
+  }
+  return _hasMessagesExternalMessageIdColumn
+}
+
 async function handleStatusUpdate(status: any) {
   const messageId = String(status?.id || "").trim()
   const state = String(status?.status || "").trim().toLowerCase()
@@ -371,36 +389,71 @@ async function handleStatusUpdate(status: any) {
         ? String(status?.errors?.[0]?.title || status?.errors?.[0]?.message || status?.errors?.[0]?.error_data?.details || "")
         : ""
 
-    await sql!`
-      UPDATE messages
-      SET metadata =
-        jsonb_set(
+    const hasExternal = await hasMessagesExternalMessageIdColumn()
+
+    if (hasExternal) {
+      await sql!`
+        UPDATE messages
+        SET metadata =
           jsonb_set(
             jsonb_set(
-              COALESCE(metadata, '{}'::jsonb),
-              '{whatsappStatus}',
-              to_jsonb(${state}),
+              jsonb_set(
+                COALESCE(metadata, '{}'::jsonb),
+                '{whatsappStatus}',
+                to_jsonb(${state}),
+                true
+              ),
+              '{whatsappStatusAt}',
+              to_jsonb(${when.toISOString()}),
               true
             ),
-            '{whatsappStatusAt}',
-            to_jsonb(${when.toISOString()}),
+            '{whatsappError}',
+            to_jsonb(${errorText}),
             true
-          ),
-          '{whatsappError}',
-          to_jsonb(${errorText}),
-          true
-        )
-      WHERE external_message_id = ${messageId}
-    `
+          )
+        WHERE external_message_id = ${messageId}
+      `
+    } else {
+      // Fallback: match by metadata.send.externalMessageId (when external_message_id column doesn't exist)
+      await sql!`
+        UPDATE messages
+        SET metadata =
+          jsonb_set(
+            jsonb_set(
+              jsonb_set(
+                COALESCE(metadata, '{}'::jsonb),
+                '{whatsappStatus}',
+                to_jsonb(${state}),
+                true
+              ),
+              '{whatsappStatusAt}',
+              to_jsonb(${when.toISOString()}),
+              true
+            ),
+            '{whatsappError}',
+            to_jsonb(${errorText}),
+            true
+          )
+        WHERE (metadata->'send'->>'externalMessageId') = ${messageId}
+      `
+    }
 
     if (state === "read") {
       const hasReadAt = await hasMessagesReadAtColumn()
       if (hasReadAt) {
-        await sql!`
-          UPDATE messages
-          SET read_at = COALESCE(read_at, ${when})
-          WHERE external_message_id = ${messageId}
-        `
+        if (hasExternal) {
+          await sql!`
+            UPDATE messages
+            SET read_at = COALESCE(read_at, ${when})
+            WHERE external_message_id = ${messageId}
+          `
+        } else {
+          await sql!`
+            UPDATE messages
+            SET read_at = COALESCE(read_at, ${when})
+            WHERE (metadata->'send'->>'externalMessageId') = ${messageId}
+          `
+        }
       }
     }
   } catch (e) {

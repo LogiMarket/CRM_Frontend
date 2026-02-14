@@ -43,7 +43,7 @@ let _hasConversationChannelColumns: boolean | null = null
 let _hasConversationExternalConversationIdColumn: boolean | null = null
 let _conversationStatusOpenValue: string | null = null
 let _conversationStatusClosedValue: string | null = null
-let _hasMessagesExtendedCols: boolean | null = null
+let _messagesColumns: Set<string> | null = null
 
 async function hasConversationChannelColumns(db: Db): Promise<boolean> {
   if (_hasConversationChannelColumns !== null) return _hasConversationChannelColumns
@@ -79,21 +79,21 @@ async function hasConversationExternalConversationIdColumn(db: Db): Promise<bool
   return _hasConversationExternalConversationIdColumn
 }
 
-async function hasMessagesExtendedCols(db: Db): Promise<boolean> {
-  if (_hasMessagesExtendedCols !== null) return _hasMessagesExtendedCols
+async function getMessagesColumns(db: Db): Promise<Set<string>> {
+  if (_messagesColumns) return _messagesColumns
   try {
     const rows = await db`
       SELECT column_name
       FROM information_schema.columns
       WHERE table_name = 'messages'
-        AND column_name IN ('channel', 'external_message_id', 'direction')
+        AND column_name IN ('channel', 'external_message_id', 'direction', 'metadata')
       ORDER BY column_name
     `
-    _hasMessagesExtendedCols = Array.isArray(rows) && rows.length === 3
+    _messagesColumns = new Set((rows || []).map((r: any) => String(r?.column_name || "").trim()).filter(Boolean))
   } catch {
-    _hasMessagesExtendedCols = false
+    _messagesColumns = new Set()
   }
-  return _hasMessagesExtendedCols
+  return _messagesColumns
 }
 
 async function getConversationStatusValues(db: Db): Promise<{ openValue: string; closedValue: string | null }> {
@@ -621,7 +621,10 @@ export async function POST(request: Request) {
     }
 
     const db = sql
-    const includeMessagesExtended = await hasMessagesExtendedCols(db)
+    const msgCols = await getMessagesColumns(db)
+    const hasMessagesDirection = msgCols.has("direction")
+    const hasMessagesExternalMessageId = msgCols.has("external_message_id")
+    const hasMessagesChannel = msgCols.has("channel")
 
     // Always have a campaignId for message metadata, even if bulk_campaigns can't be written.
     let campaignId: string = campaignIdFromClient || generateCampaignId()
@@ -699,7 +702,7 @@ export async function POST(request: Request) {
           const phoneNumber = String((ensured.contact as any)?.phone_number || "").trim()
 
           if (shouldSendWhatsappText && skipIfOutside24h) {
-            const lastInboundAt = await getLastInboundAt(db, conversationId, includeMessagesExtended)
+            const lastInboundAt = await getLastInboundAt(db, conversationId, hasMessagesDirection)
             const msSinceInbound = lastInboundAt ? Date.now() - lastInboundAt.getTime() : Number.POSITIVE_INFINITY
             const within24h = msSinceInbound >= 0 && msSinceInbound <= 24 * 60 * 60 * 1000
             if (!within24h) {
@@ -715,6 +718,7 @@ export async function POST(request: Request) {
                   send: {
                     ok: false,
                     skipped: true,
+                    externalMessageId: null,
                     error: "Fuera de ventana 24h: WhatsApp requiere una plantilla (template) aprobada",
                   },
                 },
@@ -753,21 +757,56 @@ export async function POST(request: Request) {
             send: {
               ok: sendRes.ok,
               skipped: false,
+              externalMessageId: sendRes.ok ? sendRes.externalMessageId : null,
               error: sendRes.ok ? null : String((sendRes as any)?.error || ""),
             },
           },
         })
 
-        // Best-effort update extended cols with channel/external id
-        if (includeMessagesExtended && inserted?.id && sendRes.ok) {
+        // Best-effort update extended cols with channel/external id/status direction
+        if (inserted?.id && sendRes.ok) {
           try {
-            await db`
-              UPDATE messages
-              SET channel = ${channel},
-                  external_message_id = ${sendRes.externalMessageId},
-                  direction = 'outbound'
-              WHERE id = ${inserted.id}
-            `
+            if (hasMessagesChannel && hasMessagesExternalMessageId && hasMessagesDirection) {
+              await db`
+                UPDATE messages
+                SET channel = ${channel},
+                    external_message_id = ${sendRes.externalMessageId},
+                    direction = 'outbound'
+                WHERE id = ${inserted.id}
+              `
+            } else if (hasMessagesChannel && hasMessagesExternalMessageId) {
+              await db`
+                UPDATE messages
+                SET channel = ${channel},
+                    external_message_id = ${sendRes.externalMessageId}
+                WHERE id = ${inserted.id}
+              `
+            } else if (hasMessagesExternalMessageId && hasMessagesDirection) {
+              await db`
+                UPDATE messages
+                SET external_message_id = ${sendRes.externalMessageId},
+                    direction = 'outbound'
+                WHERE id = ${inserted.id}
+              `
+            } else if (hasMessagesExternalMessageId) {
+              await db`
+                UPDATE messages
+                SET external_message_id = ${sendRes.externalMessageId}
+                WHERE id = ${inserted.id}
+              `
+            } else if (hasMessagesDirection) {
+              await db`
+                UPDATE messages
+                SET direction = 'outbound'
+                WHERE id = ${inserted.id}
+              `
+            } else if (hasMessagesChannel) {
+              await db`
+                UPDATE messages
+                SET channel = ${channel}
+                WHERE id = ${inserted.id}
+              `
+            }
           } catch {
             // ignore
           }
