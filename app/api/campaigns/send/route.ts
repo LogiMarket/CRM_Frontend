@@ -24,6 +24,17 @@ type SendMode = "auto" | "text" | "template"
 
 type BulkCampaignStatus = "scheduled" | "sending" | "completed" | "failed"
 
+function parseBooleanish(value: any, fallback: boolean) {
+  if (typeof value === "boolean") return value
+  if (typeof value === "number") return value === 1 ? true : value === 0 ? false : fallback
+  if (typeof value === "string") {
+    const v = value.trim().toLowerCase()
+    if (v === "true" || v === "1" || v === "yes" || v === "y" || v === "on") return true
+    if (v === "false" || v === "0" || v === "no" || v === "n" || v === "off") return false
+  }
+  return fallback
+}
+
 async function ensureWebhookLogsTable(db: Db) {
   try {
     await db`
@@ -629,8 +640,9 @@ export async function POST(request: Request) {
     const messageTemplate = String(body?.message || "").trim()
 
     const sendMode: SendMode = (String(body?.sendMode || "auto") as SendMode)
-    const skipIfOutside24h =
-      typeof body?.skipIfOutside24h === "boolean" ? Boolean(body.skipIfOutside24h) : sendMode === "text"
+    // Important: only skip when explicitly requested by the client.
+    // Some callers may send this as a string ("false"); treat it correctly.
+    const skipIfOutside24h = parseBooleanish(body?.skipIfOutside24h, false)
 
     const campaignName = String(body?.campaignName || "").trim() || "Campaña"
     const campaignIdFromClient = body?.campaignId ? String(body.campaignId).trim() : ""

@@ -127,6 +127,17 @@ function loadScheduledJobs(): ScheduledBulkJob[] {
     if (!raw) return []
     const parsed = JSON.parse(raw)
     if (!Array.isArray(parsed)) return []
+    const parseBooleanish = (value: any, fallback: boolean) => {
+      if (typeof value === "boolean") return value
+      if (typeof value === "number") return value === 1 ? true : value === 0 ? false : fallback
+      if (typeof value === "string") {
+        const v = value.trim().toLowerCase()
+        if (v === "true" || v === "1" || v === "yes" || v === "y" || v === "on") return true
+        if (v === "false" || v === "0" || v === "no" || v === "n" || v === "off") return false
+      }
+      return fallback
+    }
+
     return parsed
       .map((j) => ({
         id: String(j?.id || ""),
@@ -144,7 +155,7 @@ function loadScheduledJobs(): ScheduledBulkJob[] {
             }
           : null,
         sendMode: String(j?.sendMode || "auto") === "text" ? "text" : "auto",
-        skipIfOutside24h: typeof j?.skipIfOutside24h === "boolean" ? Boolean(j.skipIfOutside24h) : true,
+        skipIfOutside24h: parseBooleanish(j?.skipIfOutside24h, true),
       }))
       .filter((j) => j.id && j.scheduledAt && j.contactIds.length > 0 && j.message)
   } catch {
@@ -356,6 +367,17 @@ export default function EnviosMasivosPage() {
     const job = scheduledJobs.find((j) => j.id === jobId)
     if (!job) return
 
+    const parseBooleanish = (value: any, fallback: boolean) => {
+      if (typeof value === "boolean") return value
+      if (typeof value === "number") return value === 1 ? true : value === 0 ? false : fallback
+      if (typeof value === "string") {
+        const v = value.trim().toLowerCase()
+        if (v === "true" || v === "1" || v === "yes" || v === "y" || v === "on") return true
+        if (v === "false" || v === "0" || v === "no" || v === "n" || v === "off") return false
+      }
+      return fallback
+    }
+
     setCampaigns((prev) => prev.map((c) => (c.id === jobId ? { ...c, status: "sending" } : c)))
 
     try {
@@ -367,7 +389,7 @@ export default function EnviosMasivosPage() {
           message: job.message,
           whatsappTemplate: job.whatsappTemplate,
           sendMode: job.sendMode || "auto",
-          skipIfOutside24h: typeof job.skipIfOutside24h === "boolean" ? job.skipIfOutside24h : true,
+          skipIfOutside24h: parseBooleanish(job.skipIfOutside24h, true),
           campaignId: job.id,
           campaignName: job.name,
         }),
