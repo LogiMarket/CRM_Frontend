@@ -71,6 +71,32 @@ type RealStats = {
   responseRate: number
 }
 
+function toNumber(value: any, fallback = 0) {
+  const n = typeof value === "number" ? value : Number(value)
+  return Number.isFinite(n) ? n : fallback
+}
+
+function normalizeCampaign(input: any): Campaign | null {
+  if (!input || typeof input !== "object") return null
+  const statusRaw = String(input.status || "completed")
+  const allowedStatus: Array<Exclude<CampaignStatus, "all">> = ["completed", "sending", "scheduled", "failed"]
+  const status = (allowedStatus.includes(statusRaw as any) ? statusRaw : "completed") as Exclude<CampaignStatus, "all">
+
+  return {
+    id: String(input.id || ""),
+    name: String(input.name || "Campaña"),
+    status,
+    recipients: toNumber(input.recipients),
+    delivered: toNumber(input.delivered),
+    read: toNumber(input.read),
+    replied: toNumber(input.replied),
+    failed: input.failed == null ? undefined : toNumber(input.failed),
+    skipped: input.skipped == null ? undefined : toNumber(input.skipped),
+    date: String(input.date || ""),
+    message: String(input.message || ""),
+  }
+}
+
 const initialCampaigns: Campaign[] = [
   {
     id: "1",
@@ -337,8 +363,9 @@ export default function EnviosMasivosPage() {
         const data = await res.json().catch(() => null)
         if (!res.ok) return
         if (cancelled) return
-        const fromDb = Array.isArray(data?.campaigns) ? (data.campaigns as Campaign[]) : []
-        setCampaigns(fromDb)
+        const fromDb = Array.isArray(data?.campaigns) ? data.campaigns : []
+        const normalized = fromDb.map(normalizeCampaign).filter(Boolean) as Campaign[]
+        setCampaigns(normalized)
       } catch {
         // ignore
       }
@@ -684,8 +711,7 @@ export default function EnviosMasivosPage() {
                     {realStats ? realStats.activeCampaigns : campaigns.filter((c) => c.status === "sending").length}
                   </p>
                 </div>
-                  <p className="text-muted-foreground">Enviados</p>
-                  <p className="font-medium text-green-600">{previewCampaign.delivered}</p>
+                <Users className="h-8 w-8 text-indigo-500 opacity-50" />
               </div>
             </CardContent>
           </Card>
