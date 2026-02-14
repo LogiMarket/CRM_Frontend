@@ -472,7 +472,8 @@ export async function POST(request: Request) {
     const messageTemplate = String(body?.message || "").trim()
 
     const sendMode: SendMode = (String(body?.sendMode || "auto") as SendMode)
-    const skipIfOutside24h = Boolean(body?.skipIfOutside24h)
+    const skipIfOutside24h =
+      typeof body?.skipIfOutside24h === "boolean" ? Boolean(body.skipIfOutside24h) : sendMode === "text"
 
     const whatsappTemplate: WhatsappTemplateSpec | null = body?.whatsappTemplate
       ? {
@@ -602,11 +603,13 @@ export async function POST(request: Request) {
     const total = results.length
     const sent = results.filter((r) => r.ok).length
     const failed = total - sent
+    const skipped = results.filter((r) => r?.skipped).length
 
     return NextResponse.json({
       total,
       sent,
       failed,
+      skipped,
       results,
     })
   } catch (error) {
