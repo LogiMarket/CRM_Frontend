@@ -769,9 +769,9 @@ export async function POST(request: Request) {
         const channel = ensured.channel === "facebook" ? "facebook" : "whatsapp"
 
         const renderedBodyParams = (whatsappTemplate?.bodyParams || []).map((p) => renderMessageTemplate(p, ensured.contact))
-        const synthesizedContent =
-          messageTemplate ||
-          `[TEMPLATE:${whatsappTemplate.name} ${whatsappTemplate.language}] ${renderedBodyParams.join(" | ")}`.trim()
+        const renderedDisplayContent = messageTemplate
+          ? renderMessageTemplate(messageTemplate, ensured.contact)
+          : `Plantilla WhatsApp: ${whatsappTemplate.name} (${whatsappTemplate.language})${renderedBodyParams.length ? ` | ${renderedBodyParams.join(" | ")}` : ""}`
 
         let sendRes:
           | { ok: true; externalMessageId: string | null }
@@ -781,7 +781,7 @@ export async function POST(request: Request) {
           await insertOutboundMessage(db, {
             conversationId,
             userId: (user as any).id,
-            content: synthesizedContent,
+            content: renderedDisplayContent,
             metadata: {
               campaignId,
               campaignName,
@@ -815,7 +815,7 @@ export async function POST(request: Request) {
         const inserted = await insertOutboundMessage(db, {
           conversationId,
           userId: (user as any).id,
-          content: synthesizedContent,
+          content: renderedDisplayContent,
           metadata: {
             campaignId,
             campaignName,

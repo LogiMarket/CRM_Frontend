@@ -459,6 +459,14 @@ export default function EnviosMasivosPage() {
       toast({ title: "Falta el nombre", description: "Escribe un nombre para la campaña.", variant: "destructive" })
       return
     }
+    if (!messageTemplate) {
+      toast({
+        title: "Falta el mensaje",
+        description: "Escribe el texto que se mostrará en el historial (no se envía como texto libre; el envío real será por plantilla).",
+        variant: "destructive",
+      })
+      return
+    }
     if (selectedContacts.length === 0) {
       toast({ title: "Sin destinatarios", description: "Selecciona al menos un contacto.", variant: "destructive" })
       return
@@ -824,7 +832,7 @@ export default function EnviosMasivosPage() {
                       <div>
                         <label className="text-sm font-medium mb-1 block">Mensaje</label>
                         <Textarea
-                          placeholder="Opcional: nota interna para esta campaña (no se envía como texto libre a WhatsApp)."
+                          placeholder="Texto para historial (no se envía como texto libre; el envío real será por plantilla). Ej: Hola {{nombre}}! Bienvenido a LogiMarket."
                           rows={4}
                           value={newCampaign.message}
                           onChange={(e) => setNewCampaign((prev) => ({ ...prev, message: e.target.value }))}
