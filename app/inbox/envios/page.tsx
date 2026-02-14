@@ -57,6 +57,8 @@ type Campaign = {
   delivered: number
   read: number
   replied: number
+  failed?: number
+  skipped?: number
   date: string
   message: string
 }
@@ -126,6 +128,7 @@ type ScheduledBulkJob = {
   message: string
   whatsappTemplate: null | { name: string; language: string; bodyParams: string[] }
   sendMode?: "auto" | "text"
+  skipIfOutside24h?: boolean
 }
 
 const SCHEDULED_JOBS_STORAGE_KEY = "bulkScheduledJobs"
@@ -162,6 +165,7 @@ function loadScheduledJobs(): ScheduledBulkJob[] {
             }
           : null,
         sendMode: String(j?.sendMode || "auto") === "text" ? "text" : "auto",
+        skipIfOutside24h: typeof j?.skipIfOutside24h === "boolean" ? Boolean(j.skipIfOutside24h) : true,
       }))
       .filter((j) => j.id && j.scheduledAt && j.contactIds.length > 0 && j.message)
   } catch {
@@ -202,6 +206,7 @@ export default function EnviosMasivosPage() {
     whatsappTemplateLanguage: "",
     whatsappTemplateBodyParams: "",
     sendMode: "text" as "auto" | "text",
+    skipIfOutside24h: true,
     scheduleDate: "",
     scheduleTime: "",
   })
@@ -363,6 +368,7 @@ export default function EnviosMasivosPage() {
           message: job.message,
           whatsappTemplate: job.whatsappTemplate,
           sendMode: job.sendMode || "auto",
+          skipIfOutside24h: typeof job.skipIfOutside24h === "boolean" ? job.skipIfOutside24h : true,
           campaignId: job.id,
           campaignName: job.name,
         }),
@@ -377,6 +383,7 @@ export default function EnviosMasivosPage() {
 
       const sent = Number(data?.sent || 0)
       const failed = Number(data?.failed || 0)
+      const skipped = Number(data?.skipped || 0)
       const total = Number(data?.total || job.contactIds.length)
 
       setCampaigns((prev) =>
@@ -387,6 +394,8 @@ export default function EnviosMasivosPage() {
                 status: failed === 0 ? "completed" : sent > 0 ? "completed" : "failed",
                 recipients: total,
                 delivered: sent,
+                failed,
+                skipped,
               }
             : c,
         ),
@@ -395,8 +404,13 @@ export default function EnviosMasivosPage() {
       if (failed > 0) {
         toast({
           title: "Campaña ejecutada (parcial)",
-          description: `Enviados: ${sent}. Fallidos: ${failed}. Total: ${total}.`,
+          description: `Enviados: ${sent}. Omitidos: ${skipped}. Fallidos: ${failed}. Total: ${total}.`,
           variant: "destructive",
+        })
+      } else if (skipped > 0) {
+        toast({
+          title: "Campaña ejecutada (con omitidos)",
+          description: `Enviados: ${sent}. Omitidos: ${skipped}. Total: ${total}.`,
         })
       } else {
         toast({ title: "Campaña ejecutada", description: `Enviados ${sent} mensajes.` })
@@ -440,6 +454,7 @@ export default function EnviosMasivosPage() {
       .filter(Boolean)
 
     const sendMode = newCampaign.sendMode
+    const skipIfOutside24h = Boolean(newCampaign.skipIfOutside24h)
     const whatsappTemplate =
       sendMode !== "text" && whatsappTemplateName && whatsappTemplateLanguage
         ? { name: whatsappTemplateName, language: whatsappTemplateLanguage, bodyParams }
@@ -470,6 +485,7 @@ export default function EnviosMasivosPage() {
             name,
             message: messageTemplate,
             sendMode,
+            skipIfOutside24h,
             contactIds: selectedContacts,
             scheduledAt: scheduledAt.toISOString(),
             whatsappTemplate,
@@ -506,6 +522,7 @@ export default function EnviosMasivosPage() {
           message: messageTemplate,
           whatsappTemplate,
           sendMode,
+          skipIfOutside24h,
         },
       ])
 
@@ -518,6 +535,7 @@ export default function EnviosMasivosPage() {
         whatsappTemplateLanguage: "",
         whatsappTemplateBodyParams: "",
         sendMode: "text",
+        skipIfOutside24h: true,
         scheduleDate: "",
         scheduleTime: "",
       })
@@ -535,7 +553,14 @@ export default function EnviosMasivosPage() {
       const res = await fetch("/api/campaigns/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactIds: selectedContacts, message: messageTemplate, whatsappTemplate, sendMode, campaignName: name }),
+        body: JSON.stringify({
+          contactIds: selectedContacts,
+          message: messageTemplate,
+          whatsappTemplate,
+          sendMode,
+          skipIfOutside24h,
+          campaignName: name,
+        }),
       })
 
       const data = await res.json().catch(() => null)
@@ -546,6 +571,7 @@ export default function EnviosMasivosPage() {
 
       const sent = Number(data?.sent || 0)
       const failed = Number(data?.failed || 0)
+      const skipped = Number(data?.skipped || 0)
       const total = Number(data?.total || selectedContacts.length)
 
       const today = new Date().toISOString().slice(0, 10)
@@ -557,6 +583,8 @@ export default function EnviosMasivosPage() {
         delivered: sent,
         read: 0,
         replied: 0,
+        failed,
+        skipped,
         date: today,
         message: messageTemplate,
       }
@@ -571,6 +599,7 @@ export default function EnviosMasivosPage() {
         whatsappTemplateLanguage: "",
         whatsappTemplateBodyParams: "",
         sendMode: "text",
+        skipIfOutside24h: true,
         scheduleDate: "",
         scheduleTime: "",
       })
@@ -578,8 +607,13 @@ export default function EnviosMasivosPage() {
       if (failed > 0) {
         toast({
           title: "Envío parcial",
-          description: `Enviados: ${sent}. Fallidos: ${failed}. Total: ${total}.`,
+          description: `Enviados: ${sent}. Omitidos: ${skipped}. Fallidos: ${failed}. Total: ${total}.`,
           variant: "destructive",
+        })
+      } else if (skipped > 0) {
+        toast({
+          title: "Envío masivo enviado (con omitidos)",
+          description: `Enviados: ${sent}. Omitidos: ${skipped}. Total: ${total}.`,
         })
       } else {
         toast({ title: "Envío masivo enviado", description: `Enviados ${sent} mensajes.` })
@@ -728,6 +762,7 @@ export default function EnviosMasivosPage() {
                                   ? {
                                       ...prev,
                                       sendMode: "text",
+                                      skipIfOutside24h: true,
                                       whatsappTemplateName: "",
                                       whatsappTemplateLanguage: "",
                                       whatsappTemplateBodyParams: "",
@@ -740,6 +775,20 @@ export default function EnviosMasivosPage() {
                             <div className="text-sm">Enviar por WhatsApp como texto (sin plantilla)</div>
                             <div className="text-xs text-muted-foreground">
                               Nota: fuera de la ventana de 24h WhatsApp puede rechazar texto libre.
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 pl-6">
+                          <Checkbox
+                            checked={newCampaign.skipIfOutside24h}
+                            disabled={newCampaign.sendMode !== "text"}
+                            onCheckedChange={(v) => setNewCampaign((prev) => ({ ...prev, skipIfOutside24h: Boolean(v) }))}
+                          />
+                          <div>
+                            <div className="text-sm">Omitir contactos fuera de la ventana 24h</div>
+                            <div className="text-xs text-muted-foreground">
+                              Si lo desactivas, se intentará enviar a todos (WhatsApp puede responder error fuera de 24h).
                             </div>
                           </div>
                         </div>
@@ -1227,12 +1276,20 @@ export default function EnviosMasivosPage() {
                   <p className="font-medium text-green-600">{previewCampaign.delivered}</p>
                 </div>
                 <div>
+                  <p className="text-muted-foreground">Omitidos</p>
+                  <p className="font-medium">{Number(previewCampaign.skipped || 0)}</p>
+                </div>
+                <div>
                   <p className="text-muted-foreground">Leídos</p>
                   <p className="font-medium text-blue-600">{previewCampaign.read}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Respuestas</p>
                   <p className="font-medium text-orange-600">{previewCampaign.replied}</p>
+                </div>
+                <div>
+                  <p className="text-muted-foreground">Fallidos</p>
+                  <p className="font-medium text-red-600">{Number(previewCampaign.failed || 0)}</p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Tasa de apertura</p>

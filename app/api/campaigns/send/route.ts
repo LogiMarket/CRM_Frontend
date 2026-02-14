@@ -754,8 +754,8 @@ export async function POST(request: Request) {
 
     const total = results.length
     const sent = results.filter((r) => r.ok).length
-    const failed = total - sent
     const skipped = results.filter((r) => r?.skipped).length
+    const failed = results.filter((r) => !r.ok && !r?.skipped).length
 
     if (campaignId) {
       const status: BulkCampaignStatus = failed === 0 ? "completed" : sent > 0 ? "completed" : "failed"
