@@ -97,53 +97,6 @@ function normalizeCampaign(input: any): Campaign | null {
   }
 }
 
-const initialCampaigns: Campaign[] = [
-  {
-    id: "1",
-    name: "Promoción Enero",
-    status: "completed",
-    recipients: 150,
-    delivered: 148,
-    read: 120,
-    replied: 35,
-    date: "2026-01-10",
-    message: "Hola! Aprovecha nuestras ofertas de enero con hasta 30% de descuento.",
-  },
-  {
-    id: "2",
-    name: "Seguimiento Pedidos",
-    status: "sending",
-    recipients: 85,
-    delivered: 45,
-    read: 30,
-    replied: 12,
-    date: "2026-01-16",
-    message: "Tu pedido está en camino. Rastrea tu envío con el siguiente enlace.",
-  },
-  {
-    id: "3",
-    name: "Encuesta Satisfacción",
-    status: "scheduled",
-    recipients: 200,
-    delivered: 0,
-    read: 0,
-    replied: 0,
-    date: "2026-01-20",
-    message: "Nos gustaría conocer tu opinión sobre nuestro servicio.",
-  },
-  {
-    id: "4",
-    name: "Campaña Fallida",
-    status: "failed",
-    recipients: 50,
-    delivered: 10,
-    read: 5,
-    replied: 0,
-    date: "2026-01-08",
-    message: "Mensaje de prueba que falló.",
-  },
-]
-
 type Template = { id: string; name: string; message: string }
 
 type ScheduledBulkJob = {
@@ -218,7 +171,7 @@ const demoTemplates: Template[] = [
 
 export default function EnviosMasivosPage() {
   const { contacts, loading: contactsLoading, error: contactsError, refetch: refetchContacts } = useContacts()
-  const [campaigns, setCampaigns] = useState<Array<Campaign>>(() => initialCampaigns.map((c) => ({ ...c } as Campaign)))
+  const [campaigns, setCampaigns] = useState<Array<Campaign>>([])
   const [filter, setFilter] = useState<CampaignStatus>("all")
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
@@ -325,10 +278,6 @@ export default function EnviosMasivosPage() {
       { id: String(Date.now()), name: `${template.name} (copia)`, message: template.message },
     ])
   }
-
-  const totalSent = campaigns.reduce((acc, c) => acc + c.delivered, 0)
-  const totalRead = campaigns.reduce((acc, c) => acc + c.read, 0)
-  const totalReplied = campaigns.reduce((acc, c) => acc + c.replied, 0)
 
   useEffect(() => {
     let cancelled = false
@@ -708,7 +657,7 @@ export default function EnviosMasivosPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Campañas Activas</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {realStats ? realStats.activeCampaigns : campaigns.filter((c) => c.status === "sending").length}
+                    {realStats ? realStats.activeCampaigns : 0}
                   </p>
                 </div>
                 <Users className="h-8 w-8 text-indigo-500 opacity-50" />
@@ -721,7 +670,7 @@ export default function EnviosMasivosPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Mensajes Enviados</p>
-                  <p className="text-2xl font-bold text-foreground">{realStats ? realStats.messagesSent : totalSent}</p>
+                  <p className="text-2xl font-bold text-foreground">{realStats ? realStats.messagesSent : 0}</p>
                 </div>
                 <MessageSquare className="h-8 w-8 text-blue-500 opacity-50" />
               </div>
@@ -733,7 +682,7 @@ export default function EnviosMasivosPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Tasa de Lectura</p>
-                  <p className="text-2xl font-bold text-foreground">{realStats ? `${realStats.readRate}%` : `${totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0}%`}</p>
+                  <p className="text-2xl font-bold text-foreground">{realStats ? `${realStats.readRate}%` : "0%"}</p>
                 </div>
                 <Eye className="h-8 w-8 text-green-500 opacity-50" />
               </div>
@@ -745,7 +694,7 @@ export default function EnviosMasivosPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Tasa de Respuesta</p>
-                  <p className="text-2xl font-bold text-foreground">{realStats ? `${realStats.responseRate}%` : `${totalSent > 0 ? Math.round((totalReplied / totalSent) * 100) : 0}%`}</p>
+                  <p className="text-2xl font-bold text-foreground">{realStats ? `${realStats.responseRate}%` : "0%"}</p>
                 </div>
                 <BarChart3 className="h-8 w-8 text-orange-500 opacity-50" />
               </div>
