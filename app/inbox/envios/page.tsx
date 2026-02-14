@@ -206,6 +206,10 @@ export default function EnviosMasivosPage() {
     })
   }, [campaigns, filter, searchQuery])
 
+  const activeFromList = useMemo(() => {
+    return campaigns.filter((c) => c.status === "scheduled" || c.status === "sending").length
+  }, [campaigns])
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case "completed":
@@ -657,7 +661,7 @@ export default function EnviosMasivosPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Campañas Activas</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {realStats ? realStats.activeCampaigns : 0}
+                    {Math.max(realStats?.activeCampaigns ?? 0, activeFromList)}
                   </p>
                 </div>
                 <Users className="h-8 w-8 text-indigo-500 opacity-50" />

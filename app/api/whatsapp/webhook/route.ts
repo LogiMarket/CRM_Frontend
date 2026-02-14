@@ -4,6 +4,25 @@ import crypto from "crypto"
 
 export const runtime = "nodejs"
 
+let _hasMessagesReadAtColumn: boolean | null = null
+
+async function hasMessagesReadAtColumn(): Promise<boolean> {
+  if (_hasMessagesReadAtColumn !== null) return _hasMessagesReadAtColumn
+  try {
+    const rows: any[] = await sql!`
+      SELECT 1
+      FROM information_schema.columns
+      WHERE table_name = 'messages'
+        AND column_name = 'read_at'
+      LIMIT 1
+    `
+    _hasMessagesReadAtColumn = Array.isArray(rows) && rows.length > 0
+  } catch {
+    _hasMessagesReadAtColumn = false
+  }
+  return _hasMessagesReadAtColumn
+}
+
 // Webhook verification (GET request from Meta)
 export async function GET(request: Request) {
   try {
@@ -375,11 +394,14 @@ async function handleStatusUpdate(status: any) {
     `
 
     if (state === "read") {
-      await sql!`
-        UPDATE messages
-        SET read_at = COALESCE(read_at, ${when})
-        WHERE external_message_id = ${messageId}
-      `
+      const hasReadAt = await hasMessagesReadAtColumn()
+      if (hasReadAt) {
+        await sql!`
+          UPDATE messages
+          SET read_at = COALESCE(read_at, ${when})
+          WHERE external_message_id = ${messageId}
+        `
+      }
     }
   } catch (e) {
     console.warn("[WhatsApp Webhook] Failed to process status:", { messageId, state, error: e instanceof Error ? e.message : String(e) })

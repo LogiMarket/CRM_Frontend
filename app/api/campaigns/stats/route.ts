@@ -50,6 +50,21 @@ async function hasMessagesExtendedCols(db: Db): Promise<boolean> {
   }
 }
 
+async function getMessagesColumns(db: Db): Promise<Set<string>> {
+  try {
+    const rows: any[] = await db`
+      SELECT column_name
+      FROM information_schema.columns
+      WHERE table_name = 'messages'
+        AND column_name IN ('direction', 'metadata', 'read_at', 'sender_type', 'conversation_id', 'created_at')
+      ORDER BY column_name
+    `
+    return new Set((rows || []).map((r) => String(r?.column_name || "").trim()).filter(Boolean))
+  } catch {
+    return new Set()
+  }
+}
+
 export async function GET() {
   try {
     const user = await getSession()
@@ -128,46 +143,112 @@ export async function GET() {
     let readRate = 0
     let responseRate = 0
 
-    const hasExtended = await hasMessagesExtendedCols(db)
-    if (hasExtended) {
-      try {
-        const rows: any[] = await db`
-          SELECT
-            COUNT(*) FILTER (WHERE read_at IS NOT NULL) AS read_count,
-            COUNT(*) AS total_count
-          FROM messages
-          WHERE direction = 'outbound'
-            AND (metadata->>'campaignId') IS NOT NULL
-        `
-        const readCount = Number(rows?.[0]?.read_count || 0)
-        const totalCount = Number(rows?.[0]?.total_count || 0)
-        readRate = totalCount > 0 ? Math.round((readCount / totalCount) * 100) : 0
-      } catch {
-        // ignore
-      }
+    const cols = await getMessagesColumns(db)
+    const hasMetadata = cols.has("metadata")
+    const hasReadAt = cols.has("read_at")
+    const hasDirection = cols.has("direction")
+    const hasSenderType = cols.has("sender_type")
 
+    // Read rate
+    if (hasMetadata) {
       try {
-        const rows: any[] = await db`
-          WITH last_outbound AS (
-            SELECT conversation_id, MAX(created_at) AS last_out_at
+        if (hasReadAt && hasDirection) {
+          const rows: any[] = await db`
+            SELECT
+              COUNT(*) FILTER (WHERE read_at IS NOT NULL) AS read_count,
+              COUNT(*) AS total_count
             FROM messages
             WHERE direction = 'outbound'
               AND (metadata->>'campaignId') IS NOT NULL
-            GROUP BY conversation_id
-          ), replied AS (
-            SELECT DISTINCT m.conversation_id
-            FROM messages m
-            JOIN last_outbound lo ON lo.conversation_id = m.conversation_id
-            WHERE m.direction = 'inbound'
-              AND m.created_at > lo.last_out_at
-          )
-          SELECT
-            (SELECT COUNT(*) FROM last_outbound) AS total,
-            (SELECT COUNT(*) FROM replied) AS replied
-        `
-        const total = Number(rows?.[0]?.total || 0)
-        const replied = Number(rows?.[0]?.replied || 0)
-        responseRate = total > 0 ? Math.round((replied / total) * 100) : 0
+              AND COALESCE((metadata->>'source'), '') = 'bulk'
+          `
+          const readCount = Number(rows?.[0]?.read_count || 0)
+          const totalCount = Number(rows?.[0]?.total_count || 0)
+          readRate = totalCount > 0 ? Math.round((readCount / totalCount) * 100) : 0
+        } else if (hasDirection) {
+          // Fallback if read_at doesn't exist: use last webhook status stored in metadata.
+          const rows: any[] = await db`
+            SELECT
+              COUNT(*) FILTER (WHERE (metadata->>'whatsappStatus') = 'read') AS read_count,
+              COUNT(*) AS total_count
+            FROM messages
+            WHERE direction = 'outbound'
+              AND (metadata->>'campaignId') IS NOT NULL
+              AND COALESCE((metadata->>'source'), '') = 'bulk'
+          `
+          const readCount = Number(rows?.[0]?.read_count || 0)
+          const totalCount = Number(rows?.[0]?.total_count || 0)
+          readRate = totalCount > 0 ? Math.round((readCount / totalCount) * 100) : 0
+        } else if (hasSenderType) {
+          // Fallback without direction column.
+          const rows: any[] = await db`
+            SELECT
+              COUNT(*) FILTER (WHERE (metadata->>'whatsappStatus') = 'read') AS read_count,
+              COUNT(*) AS total_count
+            FROM messages
+            WHERE sender_type = 'agent'
+              AND (metadata->>'campaignId') IS NOT NULL
+              AND COALESCE((metadata->>'source'), '') = 'bulk'
+          `
+          const readCount = Number(rows?.[0]?.read_count || 0)
+          const totalCount = Number(rows?.[0]?.total_count || 0)
+          readRate = totalCount > 0 ? Math.round((readCount / totalCount) * 100) : 0
+        }
+      } catch {
+        // ignore
+      }
+    }
+
+    // Response rate
+    if (hasMetadata) {
+      try {
+        if (hasDirection) {
+          const rows: any[] = await db`
+            WITH last_outbound AS (
+              SELECT conversation_id, MAX(created_at) AS last_out_at
+              FROM messages
+              WHERE direction = 'outbound'
+                AND (metadata->>'campaignId') IS NOT NULL
+                AND COALESCE((metadata->>'source'), '') = 'bulk'
+              GROUP BY conversation_id
+            ), replied AS (
+              SELECT DISTINCT m.conversation_id
+              FROM messages m
+              JOIN last_outbound lo ON lo.conversation_id = m.conversation_id
+              WHERE m.direction = 'inbound'
+                AND m.created_at > lo.last_out_at
+            )
+            SELECT
+              (SELECT COUNT(*) FROM last_outbound) AS total,
+              (SELECT COUNT(*) FROM replied) AS replied
+          `
+          const total = Number(rows?.[0]?.total || 0)
+          const replied = Number(rows?.[0]?.replied || 0)
+          responseRate = total > 0 ? Math.round((replied / total) * 100) : 0
+        } else if (hasSenderType) {
+          const rows: any[] = await db`
+            WITH last_outbound AS (
+              SELECT conversation_id, MAX(created_at) AS last_out_at
+              FROM messages
+              WHERE sender_type = 'agent'
+                AND (metadata->>'campaignId') IS NOT NULL
+                AND COALESCE((metadata->>'source'), '') = 'bulk'
+              GROUP BY conversation_id
+            ), replied AS (
+              SELECT DISTINCT m.conversation_id
+              FROM messages m
+              JOIN last_outbound lo ON lo.conversation_id = m.conversation_id
+              WHERE m.sender_type IN ('customer','contact')
+                AND m.created_at > lo.last_out_at
+            )
+            SELECT
+              (SELECT COUNT(*) FROM last_outbound) AS total,
+              (SELECT COUNT(*) FROM replied) AS replied
+          `
+          const total = Number(rows?.[0]?.total || 0)
+          const replied = Number(rows?.[0]?.replied || 0)
+          responseRate = total > 0 ? Math.round((replied / total) * 100) : 0
+        }
       } catch {
         // ignore
       }
