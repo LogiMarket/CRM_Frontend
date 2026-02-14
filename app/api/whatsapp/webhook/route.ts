@@ -66,6 +66,11 @@ export async function POST(request: Request) {
         for (const message of value?.messages || []) {
           await handleIncomingMessage(message, phoneNumberId, contactsByWaId)
         }
+
+        // Status updates (delivered/read) for outbound messages
+        for (const status of value?.statuses || []) {
+          await handleStatusUpdate(status)
+        }
       }
     }
 
@@ -329,4 +334,25 @@ function parseIncomingMessage(message: any): {
 
 function normalizePhoneNumber(value: string) {
   return String(value).replace("whatsapp:", "").replace(/\D/g, "")
+}
+
+async function handleStatusUpdate(status: any) {
+  const messageId = String(status?.id || "").trim()
+  const state = String(status?.status || "").trim().toLowerCase()
+  const ts = status?.timestamp ? Number.parseInt(String(status.timestamp), 10) * 1000 : null
+  const when = ts && !Number.isNaN(ts) ? new Date(ts) : new Date()
+
+  if (!messageId || !state) return
+
+  try {
+    if (state === "read") {
+      await sql!`
+        UPDATE messages
+        SET read_at = COALESCE(read_at, ${when})
+        WHERE external_message_id = ${messageId}
+      `
+    }
+  } catch (e) {
+    console.warn("[WhatsApp Webhook] Failed to process status:", { messageId, state, error: e instanceof Error ? e.message : String(e) })
+  }
 }

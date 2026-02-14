@@ -60,6 +60,14 @@ type Campaign = {
   date: string
   message: string
 }
+type RealStats = {
+  activeCampaigns: number
+  messagesSent: number
+  messagesFailed: number
+  messagesSkipped: number
+  readRate: number
+  responseRate: number
+}
 
 const initialCampaigns: Campaign[] = [
   {
@@ -204,6 +212,7 @@ export default function EnviosMasivosPage() {
   const [templates, setTemplates] = useState<Template[]>(() => demoTemplates.map((t) => ({ ...t })))
   const [editingTemplate, setEditingTemplate] = useState<Template | null>(null)
   const [newTemplate, setNewTemplate] = useState({ name: "", message: "" })
+  const [realStats, setRealStats] = useState<RealStats | null>(null)
 
   const filteredCampaigns = useMemo(() => {
     return campaigns.filter((c) => {
@@ -291,6 +300,31 @@ export default function EnviosMasivosPage() {
   const totalReplied = campaigns.reduce((acc, c) => acc + c.replied, 0)
 
   useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/campaigns/stats")
+        const data = await res.json().catch(() => null)
+        if (!res.ok) return
+        if (cancelled) return
+        setRealStats({
+          activeCampaigns: Number(data?.activeCampaigns || 0),
+          messagesSent: Number(data?.messagesSent || 0),
+          messagesFailed: Number(data?.messagesFailed || 0),
+          messagesSkipped: Number(data?.messagesSkipped || 0),
+          readRate: Number(data?.readRate || 0),
+          responseRate: Number(data?.responseRate || 0),
+        })
+      } catch {
+        // ignore
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     setScheduledJobs(loadScheduledJobs())
   }, [])
 
@@ -329,6 +363,8 @@ export default function EnviosMasivosPage() {
           message: job.message,
           whatsappTemplate: job.whatsappTemplate,
           sendMode: job.sendMode || "auto",
+          campaignId: job.id,
+          campaignName: job.name,
         }),
       })
 
@@ -425,8 +461,30 @@ export default function EnviosMasivosPage() {
         return
       }
 
+      let campaignId = String(Date.now())
+      try {
+        const res = await fetch("/api/campaigns/schedule", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name,
+            message: messageTemplate,
+            sendMode,
+            contactIds: selectedContacts,
+            scheduledAt: scheduledAt.toISOString(),
+            whatsappTemplate,
+          }),
+        })
+        const data = await res.json().catch(() => null)
+        if (res.ok && data?.campaignId) {
+          campaignId = String(data.campaignId)
+        }
+      } catch {
+        // ignore (UI-only scheduler still works)
+      }
+
       const created: Campaign = {
-        id: String(Date.now()),
+        id: campaignId,
         name,
         status: "scheduled",
         recipients: selectedContacts.length,
@@ -477,7 +535,7 @@ export default function EnviosMasivosPage() {
       const res = await fetch("/api/campaigns/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactIds: selectedContacts, message: messageTemplate, whatsappTemplate, sendMode }),
+        body: JSON.stringify({ contactIds: selectedContacts, message: messageTemplate, whatsappTemplate, sendMode, campaignName: name }),
       })
 
       const data = await res.json().catch(() => null)
@@ -526,6 +584,24 @@ export default function EnviosMasivosPage() {
       } else {
         toast({ title: "Envío masivo enviado", description: `Enviados ${sent} mensajes.` })
       }
+
+      // Refresh real stats (best-effort)
+      try {
+        const statsRes = await fetch("/api/campaigns/stats")
+        const stats = await statsRes.json().catch(() => null)
+        if (statsRes.ok) {
+          setRealStats({
+            activeCampaigns: Number(stats?.activeCampaigns || 0),
+            messagesSent: Number(stats?.messagesSent || 0),
+            messagesFailed: Number(stats?.messagesFailed || 0),
+            messagesSkipped: Number(stats?.messagesSkipped || 0),
+            readRate: Number(stats?.readRate || 0),
+            responseRate: Number(stats?.responseRate || 0),
+          })
+        }
+      } catch {
+        // ignore
+      }
     } catch (e) {
       toast({ title: "Error", description: e instanceof Error ? e.message : "No se pudo enviar el envío masivo", variant: "destructive" })
     } finally {
@@ -545,7 +621,7 @@ export default function EnviosMasivosPage() {
                 <div>
                   <p className="text-xs text-muted-foreground">Campañas Activas</p>
                   <p className="text-2xl font-bold text-foreground">
-                    {campaigns.filter((c) => c.status === "sending").length}
+                    {realStats ? realStats.activeCampaigns : campaigns.filter((c) => c.status === "sending").length}
                   </p>
                 </div>
                 <Send className="h-8 w-8 text-primary opacity-50" />
@@ -558,7 +634,7 @@ export default function EnviosMasivosPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Mensajes Enviados</p>
-                  <p className="text-2xl font-bold text-foreground">{totalSent}</p>
+                  <p className="text-2xl font-bold text-foreground">{realStats ? realStats.messagesSent : totalSent}</p>
                 </div>
                 <MessageSquare className="h-8 w-8 text-blue-500 opacity-50" />
               </div>
@@ -570,9 +646,7 @@ export default function EnviosMasivosPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Tasa de Lectura</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0}%
-                  </p>
+                  <p className="text-2xl font-bold text-foreground">{realStats ? `${realStats.readRate}%` : `${totalSent > 0 ? Math.round((totalRead / totalSent) * 100) : 0}%`}</p>
                 </div>
                 <Eye className="h-8 w-8 text-green-500 opacity-50" />
               </div>
@@ -584,9 +658,7 @@ export default function EnviosMasivosPage() {
               <div className="flex items-center justify-between">
                 <div>
                   <p className="text-xs text-muted-foreground">Tasa de Respuesta</p>
-                  <p className="text-2xl font-bold text-foreground">
-                    {totalSent > 0 ? Math.round((totalReplied / totalSent) * 100) : 0}%
-                  </p>
+                  <p className="text-2xl font-bold text-foreground">{realStats ? `${realStats.responseRate}%` : `${totalSent > 0 ? Math.round((totalReplied / totalSent) * 100) : 0}%`}</p>
                 </div>
                 <BarChart3 className="h-8 w-8 text-orange-500 opacity-50" />
               </div>

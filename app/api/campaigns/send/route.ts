@@ -22,6 +22,8 @@ type WhatsappTemplateSpec = {
 
 type SendMode = "auto" | "text" | "template"
 
+type BulkCampaignStatus = "scheduled" | "sending" | "completed" | "failed"
+
 function renderMessageTemplate(template: string, contact: any) {
   const name = String(contact?.name || "").trim()
   const phone = String(contact?.phone_number || "").trim()
@@ -374,35 +376,65 @@ async function sendFacebookText(message: string, recipientId: string) {
   return { ok: true as const, externalMessageId: String(data?.message_id || "") || null, data }
 }
 
-async function insertOutboundMessage(db: Db, opts: { conversationId: string; userId: string | number; content: string }) {
-  const { conversationId, userId, content } = opts
+async function insertOutboundMessage(
+  db: Db,
+  opts: { conversationId: string; userId: string | number; content: string; metadata?: any },
+) {
+  const { conversationId, userId, content, metadata } = opts
 
   let messageRow: any = null
   try {
     // try UUID insert
-    const result = await db`
-      INSERT INTO messages (conversation_id, sender_type, sender_id, content)
-      VALUES (${conversationId}::uuid, 'agent', ${userId}, ${content})
-      RETURNING id
-    `
+    let result: any[] = []
+    try {
+      result = await db`
+        INSERT INTO messages (conversation_id, sender_type, sender_id, content, metadata)
+        VALUES (${conversationId}::uuid, 'agent', ${userId}, ${content}, ${metadata ? JSON.stringify(metadata) : null}::jsonb)
+        RETURNING id
+      `
+    } catch {
+      result = await db`
+        INSERT INTO messages (conversation_id, sender_type, sender_id, content)
+        VALUES (${conversationId}::uuid, 'agent', ${userId}, ${content})
+        RETURNING id
+      `
+    }
     messageRow = result?.[0] || null
   } catch {
     // fallback to number insert
     try {
       const asNumber = Number.parseInt(conversationId)
-      const result = await db`
-        INSERT INTO messages (conversation_id, sender_type, sender_id, content)
-        VALUES (${asNumber}, 'agent', ${userId}, ${content})
-        RETURNING id
-      `
+      let result: any[] = []
+      try {
+        result = await db`
+          INSERT INTO messages (conversation_id, sender_type, sender_id, content, metadata)
+          VALUES (${asNumber}, 'agent', ${userId}, ${content}, ${metadata ? JSON.stringify(metadata) : null}::jsonb)
+          RETURNING id
+        `
+      } catch {
+        result = await db`
+          INSERT INTO messages (conversation_id, sender_type, sender_id, content)
+          VALUES (${asNumber}, 'agent', ${userId}, ${content})
+          RETURNING id
+        `
+      }
       messageRow = result?.[0] || null
     } catch {
       // final fallback: insert without casting
-      const result = await db`
-        INSERT INTO messages (conversation_id, sender_type, sender_id, content)
-        VALUES (${conversationId}, 'agent', ${userId}, ${content})
-        RETURNING id
-      `
+      let result: any[] = []
+      try {
+        result = await db`
+          INSERT INTO messages (conversation_id, sender_type, sender_id, content, metadata)
+          VALUES (${conversationId}, 'agent', ${userId}, ${content}, ${metadata ? JSON.stringify(metadata) : null}::jsonb)
+          RETURNING id
+        `
+      } catch {
+        result = await db`
+          INSERT INTO messages (conversation_id, sender_type, sender_id, content)
+          VALUES (${conversationId}, 'agent', ${userId}, ${content})
+          RETURNING id
+        `
+      }
       messageRow = result?.[0] || null
     }
   }
@@ -419,6 +451,95 @@ async function insertOutboundMessage(db: Db, opts: { conversationId: string; use
   }
 
   return messageRow
+}
+
+async function ensureBulkCampaignTables(db: Db) {
+  try {
+    await db`
+      CREATE TABLE IF NOT EXISTS bulk_campaigns (
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        message TEXT NOT NULL,
+        send_mode VARCHAR(20) DEFAULT 'auto',
+        whatsapp_template JSONB,
+        status VARCHAR(20) DEFAULT 'scheduled',
+        total INTEGER DEFAULT 0,
+        sent INTEGER DEFAULT 0,
+        failed INTEGER DEFAULT 0,
+        skipped INTEGER DEFAULT 0,
+        scheduled_at TIMESTAMP NULL,
+        started_at TIMESTAMP NULL,
+        completed_at TIMESTAMP NULL,
+        created_by INTEGER NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+    await db`CREATE INDEX IF NOT EXISTS idx_bulk_campaigns_status ON bulk_campaigns(status)`
+    await db`CREATE INDEX IF NOT EXISTS idx_bulk_campaigns_created_at ON bulk_campaigns(created_at)`
+  } catch {
+    // If the DB user lacks privileges, stats will still fallback to message-only.
+  }
+}
+
+async function createBulkCampaign(
+  db: Db,
+  input: {
+    name: string
+    message: string
+    sendMode: SendMode
+    whatsappTemplate: WhatsappTemplateSpec | null
+    total: number
+    createdBy: any
+    scheduledAt?: Date | null
+    status: BulkCampaignStatus
+  },
+) {
+  try {
+    const rows: any[] = await db`
+      INSERT INTO bulk_campaigns (name, message, send_mode, whatsapp_template, status, total, scheduled_at, created_by, created_at, updated_at)
+      VALUES (
+        ${input.name},
+        ${input.message},
+        ${input.sendMode},
+        ${input.whatsappTemplate ? JSON.stringify(input.whatsappTemplate) : null}::jsonb,
+        ${input.status},
+        ${input.total},
+        ${input.scheduledAt || null},
+        ${typeof input.createdBy === "number" ? input.createdBy : null},
+        NOW(),
+        NOW()
+      )
+      RETURNING id
+    `
+    return rows?.[0]?.id ? String(rows[0].id) : null
+  } catch {
+    return null
+  }
+}
+
+async function updateBulkCampaign(
+  db: Db,
+  campaignId: string,
+  patch: Partial<{ status: BulkCampaignStatus; sent: number; failed: number; skipped: number; total: number; startedAt: Date | null; completedAt: Date | null }>,
+) {
+  try {
+    await db`
+      UPDATE bulk_campaigns
+      SET
+        status = COALESCE(${patch.status || null}, status),
+        sent = COALESCE(${typeof patch.sent === "number" ? patch.sent : null}, sent),
+        failed = COALESCE(${typeof patch.failed === "number" ? patch.failed : null}, failed),
+        skipped = COALESCE(${typeof patch.skipped === "number" ? patch.skipped : null}, skipped),
+        total = COALESCE(${typeof patch.total === "number" ? patch.total : null}, total),
+        started_at = COALESCE(${patch.startedAt ?? null}, started_at),
+        completed_at = COALESCE(${patch.completedAt ?? null}, completed_at),
+        updated_at = NOW()
+      WHERE id::text = ${campaignId}
+    `
+  } catch {
+    // ignore
+  }
 }
 
 async function getLastInboundAt(db: Db, conversationId: string, hasExtendedDirection: boolean) {
@@ -475,6 +596,9 @@ export async function POST(request: Request) {
     const skipIfOutside24h =
       typeof body?.skipIfOutside24h === "boolean" ? Boolean(body.skipIfOutside24h) : sendMode === "text"
 
+    const campaignName = String(body?.campaignName || "").trim() || "Campaña"
+    const campaignIdFromClient = body?.campaignId ? String(body.campaignId).trim() : ""
+
     const whatsappTemplate: WhatsappTemplateSpec | null = body?.whatsappTemplate
       ? {
           name: String(body.whatsappTemplate?.name || "").trim(),
@@ -494,6 +618,27 @@ export async function POST(request: Request) {
 
     const db = sql
     const includeMessagesExtended = await hasMessagesExtendedCols(db)
+
+    await ensureBulkCampaignTables(db)
+
+    let campaignId = campaignIdFromClient || null
+    if (!campaignId) {
+      campaignId = await createBulkCampaign(db, {
+        name: campaignName,
+        message: messageTemplate,
+        sendMode,
+        whatsappTemplate,
+        total: contactIds.length,
+        createdBy: (user as any)?.id,
+        status: "sending",
+      })
+    } else {
+      await updateBulkCampaign(db, campaignId, { status: "sending", startedAt: new Date(), total: contactIds.length })
+    }
+
+    if (campaignId) {
+      await updateBulkCampaign(db, campaignId, { status: "sending", startedAt: new Date() })
+    }
 
     const results: Array<any> = []
 
@@ -565,6 +710,13 @@ export async function POST(request: Request) {
           conversationId,
           userId: (user as any).id,
           content: renderedContent,
+          metadata: campaignId
+            ? {
+                campaignId,
+                campaignName,
+                source: "bulk",
+              }
+            : undefined,
         })
 
         // Best-effort update extended cols with channel/external id
@@ -605,7 +757,20 @@ export async function POST(request: Request) {
     const failed = total - sent
     const skipped = results.filter((r) => r?.skipped).length
 
+    if (campaignId) {
+      const status: BulkCampaignStatus = failed === 0 ? "completed" : sent > 0 ? "completed" : "failed"
+      await updateBulkCampaign(db, campaignId, {
+        status,
+        total,
+        sent,
+        failed,
+        skipped,
+        completedAt: new Date(),
+      })
+    }
+
     return NextResponse.json({
+      campaignId,
       total,
       sent,
       failed,
