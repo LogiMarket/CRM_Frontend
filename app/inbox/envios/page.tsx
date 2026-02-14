@@ -338,9 +338,7 @@ export default function EnviosMasivosPage() {
         if (!res.ok) return
         if (cancelled) return
         const fromDb = Array.isArray(data?.campaigns) ? (data.campaigns as Campaign[]) : []
-        if (fromDb.length > 0) {
-          setCampaigns(fromDb)
-        }
+        setCampaigns(fromDb)
       } catch {
         // ignore
       }

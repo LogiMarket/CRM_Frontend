@@ -93,6 +93,63 @@ export async function GET() {
       rows = []
     }
 
+    // Fallback: derive campaigns from messages.metadata if bulk_campaigns is empty/unavailable
+    if (!rows || rows.length === 0) {
+      try {
+        const agg: any[] = await db`
+          WITH m AS (
+            SELECT
+              (metadata->>'campaignId') AS campaign_id,
+              COALESCE(NULLIF(metadata->>'campaignName', ''), 'Campaña') AS name,
+              MAX(created_at) AS last_at,
+              COUNT(*) AS total,
+              COUNT(*) FILTER (WHERE (metadata->>'source') = 'bulk' AND (metadata->'send'->>'ok') = 'true') AS sent,
+              COUNT(*) FILTER (WHERE (metadata->>'source') = 'bulk' AND (metadata->'send'->>'skipped') = 'true') AS skipped,
+              COUNT(*) FILTER (
+                WHERE (metadata->>'source') = 'bulk'
+                  AND (metadata->'send'->>'ok') = 'false'
+                  AND COALESCE((metadata->'send'->>'skipped'), 'false') != 'true'
+              ) AS failed
+            FROM messages
+            WHERE (metadata->>'campaignId') IS NOT NULL
+              AND (metadata->>'source') = 'bulk'
+            GROUP BY 1, 2
+          )
+          SELECT *
+          FROM m
+          ORDER BY last_at DESC
+          LIMIT 50
+        `
+
+        const campaigns = (agg || []).map((r) => {
+          const total = Number(r?.total || 0)
+          const sent = Number(r?.sent || 0)
+          const failed = Number(r?.failed || 0)
+          const skipped = Number(r?.skipped || 0)
+          const date = formatDate(r?.last_at)
+          const status: BulkCampaignStatus = failed === 0 ? "completed" : sent > 0 ? "completed" : "failed"
+
+          return {
+            id: String(r?.campaign_id || ""),
+            name: String(r?.name || "Campaña"),
+            status,
+            recipients: total,
+            delivered: sent,
+            read: 0,
+            replied: 0,
+            failed,
+            skipped,
+            date,
+            message: "",
+          }
+        })
+
+        return NextResponse.json({ campaigns })
+      } catch {
+        // ignore
+      }
+    }
+
     const campaigns = (rows || []).map((r) => {
       const status = String(r?.status || "scheduled") as BulkCampaignStatus
       const recipients = Number(r?.total || 0)
