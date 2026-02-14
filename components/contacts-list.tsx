@@ -191,7 +191,7 @@ export function ContactsList({ selectedId, onSelect, onChat, headerRight, onDele
           )}
         </div>
 
-        <ScrollArea className="flex-1">
+        <ScrollArea className="flex-1 min-h-0">
           <div className="space-y-2 p-3 pr-4">
             {filteredContacts.length === 0 ? (
               <div className="rounded-lg border bg-background p-4 text-center text-sm text-muted-foreground">
