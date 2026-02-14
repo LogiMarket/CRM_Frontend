@@ -24,6 +24,38 @@ type SendMode = "auto" | "text" | "template"
 
 type BulkCampaignStatus = "scheduled" | "sending" | "completed" | "failed"
 
+async function ensureWebhookLogsTable(db: Db) {
+  try {
+    await db`
+      CREATE TABLE IF NOT EXISTS webhook_logs (
+        id SERIAL PRIMARY KEY,
+        channel VARCHAR(50) NOT NULL,
+        external_id VARCHAR(255),
+        payload JSONB,
+        processed BOOLEAN DEFAULT FALSE,
+        error TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_channel ON webhook_logs(channel)`
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_processed ON webhook_logs(processed)`
+  } catch {
+    // ignore
+  }
+}
+
+async function recordCampaignEvent(db: Db, campaignId: string, payload: any) {
+  try {
+    await ensureWebhookLogsTable(db)
+    await db`
+      INSERT INTO webhook_logs (channel, external_id, payload, processed)
+      VALUES ('bulk_campaign', ${campaignId}, ${JSON.stringify(payload)}::jsonb, true)
+    `
+  } catch {
+    // ignore
+  }
+}
+
 function renderMessageTemplate(template: string, contact: any) {
   const name = String(contact?.name || "").trim()
   const phone = String(contact?.phone_number || "").trim()
@@ -662,6 +694,24 @@ export async function POST(request: Request) {
       await updateBulkCampaign(db, persistedCampaignId, { status: "sending", startedAt: new Date() })
     }
 
+    // If this campaign isn't in bulk_campaigns, still persist an event so it shows up in lists/stats.
+    if (!persistedCampaignId && campaignId) {
+      await recordCampaignEvent(db, campaignId, {
+        kind: "campaign",
+        id: campaignId,
+        name: campaignName,
+        message: messageTemplate,
+        sendMode,
+        whatsappTemplate: sendMode === "text" ? null : whatsappTemplate,
+        status: "sending",
+        total: contactIds.length,
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+        startedAt: new Date().toISOString(),
+      })
+    }
+
     const results: Array<any> = []
 
     // Sequential send to avoid rate limits
@@ -844,6 +894,24 @@ export async function POST(request: Request) {
         failed,
         skipped,
         completedAt: new Date(),
+      })
+    }
+
+    if (!persistedCampaignId && campaignId) {
+      const status: BulkCampaignStatus = failed === 0 ? "completed" : sent > 0 ? "completed" : "failed"
+      await recordCampaignEvent(db, campaignId, {
+        kind: "campaign",
+        id: campaignId,
+        name: campaignName,
+        message: messageTemplate,
+        sendMode,
+        whatsappTemplate: sendMode === "text" ? null : whatsappTemplate,
+        status,
+        total,
+        sent,
+        failed,
+        skipped,
+        completedAt: new Date().toISOString(),
       })
     }
 

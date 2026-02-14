@@ -65,6 +65,26 @@ async function getMessagesColumns(db: Db): Promise<Set<string>> {
   }
 }
 
+async function ensureWebhookLogsTable(db: Db) {
+  try {
+    await db`
+      CREATE TABLE IF NOT EXISTS webhook_logs (
+        id SERIAL PRIMARY KEY,
+        channel VARCHAR(50) NOT NULL,
+        external_id VARCHAR(255),
+        payload JSONB,
+        processed BOOLEAN DEFAULT FALSE,
+        error TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_channel ON webhook_logs(channel)`
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_processed ON webhook_logs(processed)`
+  } catch {
+    // ignore
+  }
+}
+
 export async function GET() {
   try {
     const user = await getSession()
@@ -137,7 +157,32 @@ export async function GET() {
       `
       activeCampaigns = Number(rows?.[0]?.c || 0)
     } catch {
-      // ignore (no reliable fallback without bulk_campaigns)
+      // ignore
+    }
+
+    // Fallback/augmentation for active campaigns persisted as events in webhook_logs
+    try {
+      await ensureWebhookLogsTable(db)
+      const rows: any[] = await db`
+        WITH latest AS (
+          SELECT DISTINCT ON (external_id)
+            external_id,
+            payload,
+            created_at
+          FROM webhook_logs
+          WHERE channel = 'bulk_campaign'
+            AND external_id IS NOT NULL
+            AND external_id !~ '^[0-9]+$'
+          ORDER BY external_id, created_at DESC
+        )
+        SELECT COUNT(*) AS c
+        FROM latest
+        WHERE COALESCE((payload->>'status'), '') IN ('scheduled', 'sending')
+      `
+      const activeFromLogs = Number(rows?.[0]?.c || 0)
+      activeCampaigns = Math.max(activeCampaigns, activeFromLogs)
+    } catch {
+      // ignore
     }
 
     let readRate = 0

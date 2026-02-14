@@ -81,6 +81,43 @@ async function createBulkCampaign(
   }
 }
 
+function generateFallbackCampaignId() {
+  return `bulk_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
+async function ensureWebhookLogsTable(db: Db) {
+  try {
+    await db`
+      CREATE TABLE IF NOT EXISTS webhook_logs (
+        id SERIAL PRIMARY KEY,
+        channel VARCHAR(50) NOT NULL,
+        external_id VARCHAR(255),
+        payload JSONB,
+        processed BOOLEAN DEFAULT FALSE,
+        error TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_channel ON webhook_logs(channel)`
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_processed ON webhook_logs(processed)`
+  } catch {
+    // ignore
+  }
+}
+
+async function recordCampaignEvent(db: Db, campaignId: string, payload: any) {
+  try {
+    await ensureWebhookLogsTable(db)
+    await db`
+      INSERT INTO webhook_logs (channel, external_id, payload, processed)
+      VALUES ('bulk_campaign', ${campaignId}, ${JSON.stringify(payload)}::jsonb, true)
+    `
+    return true
+  } catch {
+    return false
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const user = await getSession()
@@ -133,7 +170,7 @@ export async function POST(request: Request) {
     const db = sql
     await ensureBulkCampaignTables(db)
 
-    const campaignId = await createBulkCampaign(db, {
+    let campaignId = await createBulkCampaign(db, {
       name,
       message,
       sendMode,
@@ -144,7 +181,29 @@ export async function POST(request: Request) {
       status: "scheduled",
     })
 
-    return NextResponse.json({ campaignId })
+    // Fallback: if bulk_campaigns couldn't be written (permissions/schema), persist via webhook_logs
+    if (!campaignId) {
+      campaignId = generateFallbackCampaignId()
+      await recordCampaignEvent(db, campaignId, {
+        kind: "campaign",
+        id: campaignId,
+        name,
+        message,
+        sendMode,
+        whatsappTemplate: sendMode === "text" ? null : whatsappTemplate,
+        status: "scheduled",
+        total: contactIds.length,
+        sent: 0,
+        failed: 0,
+        skipped: 0,
+        scheduledAt: scheduledAt.toISOString(),
+        createdAt: new Date().toISOString(),
+      })
+
+      return NextResponse.json({ campaignId, persisted: false, storage: "webhook_logs" })
+    }
+
+    return NextResponse.json({ campaignId, persisted: true, storage: "bulk_campaigns" })
   } catch (error) {
     console.error("[Campaigns Schedule] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

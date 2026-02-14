@@ -47,6 +47,70 @@ function formatDate(value: any) {
   }
 }
 
+async function ensureWebhookLogsTable(db: Db) {
+  try {
+    await db`
+      CREATE TABLE IF NOT EXISTS webhook_logs (
+        id SERIAL PRIMARY KEY,
+        channel VARCHAR(50) NOT NULL,
+        external_id VARCHAR(255),
+        payload JSONB,
+        processed BOOLEAN DEFAULT FALSE,
+        error TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_channel ON webhook_logs(channel)`
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_processed ON webhook_logs(processed)`
+  } catch {
+    // ignore
+  }
+}
+
+async function loadCampaignsFromWebhookLogs(db: Db) {
+  await ensureWebhookLogsTable(db)
+  try {
+    const rows: any[] = await db`
+      SELECT DISTINCT ON (external_id)
+        external_id,
+        payload,
+        created_at
+      FROM webhook_logs
+      WHERE channel = 'bulk_campaign'
+        AND external_id IS NOT NULL
+      ORDER BY external_id, created_at DESC
+      LIMIT 50
+    `
+
+    return (rows || []).map((r) => {
+      const p = r?.payload || {}
+      const id = String(r?.external_id || "")
+      const status = String(p?.status || "scheduled") as BulkCampaignStatus
+      const total = Number(p?.total || 0)
+      const sent = Number(p?.sent || 0)
+      const failed = Number(p?.failed || 0)
+      const skipped = Number(p?.skipped || 0)
+      const date = formatDate(p?.completedAt || p?.startedAt || p?.scheduledAt || p?.createdAt || r?.created_at)
+
+      return {
+        id,
+        name: String(p?.name || "Campaña"),
+        status,
+        recipients: total,
+        delivered: sent,
+        read: 0,
+        replied: 0,
+        failed,
+        skipped,
+        date,
+        message: String(p?.message || ""),
+      }
+    })
+  } catch {
+    return []
+  }
+}
+
 export async function GET() {
   try {
     const user = await getSession()
@@ -68,6 +132,8 @@ export async function GET() {
 
     const db = sql
     await ensureBulkCampaignTables(db)
+
+    const fromLogs = await loadCampaignsFromWebhookLogs(db)
 
     let rows: any[] = []
     try {
@@ -144,7 +210,13 @@ export async function GET() {
           }
         })
 
-        return NextResponse.json({ campaigns })
+        // Merge with webhook_logs campaigns (scheduled/sending) and dedupe by id
+        const byId = new Map<string, any>()
+        for (const c of [...fromLogs, ...campaigns]) {
+          if (!c?.id) continue
+          if (!byId.has(c.id)) byId.set(c.id, c)
+        }
+        return NextResponse.json({ campaigns: Array.from(byId.values()).slice(0, 50) })
       } catch {
         // ignore
       }
@@ -174,7 +246,14 @@ export async function GET() {
       }
     })
 
-    return NextResponse.json({ campaigns })
+    // Merge with webhook_logs campaigns and dedupe by id
+    const byId = new Map<string, any>()
+    for (const c of [...fromLogs, ...campaigns]) {
+      if (!c?.id) continue
+      if (!byId.has(c.id)) byId.set(c.id, c)
+    }
+
+    return NextResponse.json({ campaigns: Array.from(byId.values()).slice(0, 50) })
   } catch (error) {
     console.error("[Campaigns List] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
