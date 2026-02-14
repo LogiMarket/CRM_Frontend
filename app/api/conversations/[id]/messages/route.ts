@@ -283,33 +283,65 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     // Fetch delivery info (best-effort across schemas)
     let delivery: { channel: string; phoneNumber: string | null } = { channel: "whatsapp", phoneNumber: null }
     try {
-      const rows: any[] = await sql!`
-        SELECT
-          COALESCE(conv.channel, c.channel, 'whatsapp') as channel,
-          c.phone_number
-        FROM conversations conv
-        LEFT JOIN contacts c ON conv.contact_id = c.id
-        WHERE conv.id::text = ${id}
-        LIMIT 1
+      const cols: any[] = await sql!`
+        SELECT table_name, column_name
+        FROM information_schema.columns
+        WHERE table_name IN ('conversations', 'contacts')
+          AND column_name = 'channel'
+        ORDER BY table_name
       `
-      delivery = {
-        channel: String(rows?.[0]?.channel || "whatsapp").toLowerCase(),
-        phoneNumber: rows?.[0]?.phone_number ? String(rows[0].phone_number) : null,
-      }
-    } catch {
-      // Older schemas may not have conversations.channel / contacts.channel
-      try {
-        const rows: any[] = await sql!`
-          SELECT c.phone_number
+      const hasConvChannel = (cols || []).some((r: any) => String(r?.table_name || "") === "conversations")
+      const hasContactChannel = (cols || []).some((r: any) => String(r?.table_name || "") === "contacts")
+
+      let rows: any[] = []
+      if (hasConvChannel && hasContactChannel) {
+        rows = await sql!`
+          SELECT
+            COALESCE(conv.channel, c.channel, 'whatsapp') as channel,
+            c.phone_number
           FROM conversations conv
           LEFT JOIN contacts c ON conv.contact_id = c.id
           WHERE conv.id::text = ${id}
           LIMIT 1
         `
-        delivery = { channel: "whatsapp", phoneNumber: rows?.[0]?.phone_number ? String(rows[0].phone_number) : null }
-      } catch {
-        delivery = { channel: "whatsapp", phoneNumber: null }
+      } else if (hasConvChannel) {
+        rows = await sql!`
+          SELECT
+            COALESCE(conv.channel, 'whatsapp') as channel,
+            c.phone_number
+          FROM conversations conv
+          LEFT JOIN contacts c ON conv.contact_id = c.id
+          WHERE conv.id::text = ${id}
+          LIMIT 1
+        `
+      } else if (hasContactChannel) {
+        rows = await sql!`
+          SELECT
+            COALESCE(c.channel, 'whatsapp') as channel,
+            c.phone_number
+          FROM conversations conv
+          LEFT JOIN contacts c ON conv.contact_id = c.id
+          WHERE conv.id::text = ${id}
+          LIMIT 1
+        `
+      } else {
+        rows = await sql!`
+          SELECT
+            'whatsapp' as channel,
+            c.phone_number
+          FROM conversations conv
+          LEFT JOIN contacts c ON conv.contact_id = c.id
+          WHERE conv.id::text = ${id}
+          LIMIT 1
+        `
       }
+
+      delivery = {
+        channel: String(rows?.[0]?.channel || "whatsapp").toLowerCase(),
+        phoneNumber: rows?.[0]?.phone_number ? String(rows[0].phone_number) : null,
+      }
+    } catch {
+      delivery = { channel: "whatsapp", phoneNumber: null }
     }
 
     // Deliver message externally (WhatsApp) BEFORE inserting into DB so UI doesn't show false success

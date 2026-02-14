@@ -825,6 +825,7 @@ export async function POST(request: Request) {
               skipped: false,
               externalMessageId: sendRes.ok ? sendRes.externalMessageId : null,
               error: sendRes.ok ? null : String((sendRes as any)?.error || ""),
+              details: sendRes.ok ? null : (sendRes as any)?.details ?? null,
             },
           },
         })
@@ -885,6 +886,7 @@ export async function POST(request: Request) {
           sendType: "template",
           ok: sendRes.ok,
           externalMessageId: sendRes.ok ? sendRes.externalMessageId : null,
+          details: sendRes.ok ? null : (sendRes as any)?.details ?? null,
           error:
             sendRes.ok
               ? null
