@@ -77,6 +77,28 @@ export async function GET() {
     let totalFailed = 0
     let totalSkipped = 0
 
+    const computeFromMessages = async () => {
+      try {
+        const rows: any[] = await db`
+          SELECT
+            COUNT(*) FILTER (WHERE (metadata->>'source') = 'bulk' AND (metadata->'send'->>'ok') = 'true') AS sent,
+            COUNT(*) FILTER (WHERE (metadata->>'source') = 'bulk' AND (metadata->'send'->>'skipped') = 'true') AS skipped,
+            COUNT(*) FILTER (
+              WHERE (metadata->>'source') = 'bulk'
+                AND (metadata->'send'->>'ok') = 'false'
+                AND COALESCE((metadata->'send'->>'skipped'), 'false') != 'true'
+            ) AS failed
+          FROM messages
+          WHERE (metadata->>'campaignId') IS NOT NULL
+        `
+        totalSent = Number(rows?.[0]?.sent || 0)
+        totalFailed = Number(rows?.[0]?.failed || 0)
+        totalSkipped = Number(rows?.[0]?.skipped || 0)
+      } catch {
+        // ignore
+      }
+    }
+
     try {
       const rows: any[] = await db`
         SELECT
@@ -89,7 +111,7 @@ export async function GET() {
       totalFailed = Number(rows?.[0]?.failed || 0)
       totalSkipped = Number(rows?.[0]?.skipped || 0)
     } catch {
-      // ignore
+      await computeFromMessages()
     }
 
     try {
@@ -100,7 +122,7 @@ export async function GET() {
       `
       activeCampaigns = Number(rows?.[0]?.c || 0)
     } catch {
-      // ignore
+      // ignore (no reliable fallback without bulk_campaigns)
     }
 
     let readRate = 0

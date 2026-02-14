@@ -482,6 +482,10 @@ async function ensureBulkCampaignTables(db: Db) {
   }
 }
 
+function generateCampaignId() {
+  return `bulk_${Date.now()}_${Math.random().toString(16).slice(2)}`
+}
+
 async function createBulkCampaign(
   db: Db,
   input: {
@@ -619,25 +623,40 @@ export async function POST(request: Request) {
     const db = sql
     const includeMessagesExtended = await hasMessagesExtendedCols(db)
 
-    await ensureBulkCampaignTables(db)
+    // Always have a campaignId for message metadata, even if bulk_campaigns can't be written.
+    let campaignId: string = campaignIdFromClient || generateCampaignId()
+    let persistedCampaignId: string | null = null
 
-    let campaignId = campaignIdFromClient || null
-    if (!campaignId) {
-      campaignId = await createBulkCampaign(db, {
-        name: campaignName,
-        message: messageTemplate,
-        sendMode,
-        whatsappTemplate,
-        total: contactIds.length,
-        createdBy: (user as any)?.id,
-        status: "sending",
-      })
-    } else {
-      await updateBulkCampaign(db, campaignId, { status: "sending", startedAt: new Date(), total: contactIds.length })
+    // Best-effort persistence in bulk_campaigns (can fail if DB user has no CREATE/INSERT privileges)
+    await ensureBulkCampaignTables(db)
+    try {
+      if (!campaignIdFromClient) {
+        const created = await createBulkCampaign(db, {
+          name: campaignName,
+          message: messageTemplate,
+          sendMode,
+          whatsappTemplate,
+          total: contactIds.length,
+          createdBy: (user as any)?.id,
+          status: "sending",
+        })
+        if (created) {
+          campaignId = created
+          persistedCampaignId = created
+        }
+      } else {
+        // Only attempt update if the id looks numeric (bulk_campaigns is SERIAL)
+        if (/^\d+$/.test(campaignIdFromClient)) {
+          persistedCampaignId = campaignIdFromClient
+          await updateBulkCampaign(db, campaignIdFromClient, { status: "sending", startedAt: new Date(), total: contactIds.length })
+        }
+      }
+    } catch {
+      // ignore
     }
 
-    if (campaignId) {
-      await updateBulkCampaign(db, campaignId, { status: "sending", startedAt: new Date() })
+    if (persistedCampaignId) {
+      await updateBulkCampaign(db, persistedCampaignId, { status: "sending", startedAt: new Date() })
     }
 
     const results: Array<any> = []
@@ -684,6 +703,23 @@ export async function POST(request: Request) {
             const msSinceInbound = lastInboundAt ? Date.now() - lastInboundAt.getTime() : Number.POSITIVE_INFINITY
             const within24h = msSinceInbound >= 0 && msSinceInbound <= 24 * 60 * 60 * 1000
             if (!within24h) {
+              // Save an outbound attempt marked as skipped so stats/UI can reflect it.
+              await insertOutboundMessage(db, {
+                conversationId,
+                userId: (user as any).id,
+                content: renderedContent,
+                metadata: {
+                  campaignId,
+                  campaignName,
+                  source: "bulk",
+                  send: {
+                    ok: false,
+                    skipped: true,
+                    error: "Fuera de ventana 24h: WhatsApp requiere una plantilla (template) aprobada",
+                  },
+                },
+              })
+
               results.push({
                 contactId: contactIdText,
                 conversationId,
@@ -710,13 +746,16 @@ export async function POST(request: Request) {
           conversationId,
           userId: (user as any).id,
           content: renderedContent,
-          metadata: campaignId
-            ? {
-                campaignId,
-                campaignName,
-                source: "bulk",
-              }
-            : undefined,
+          metadata: {
+            campaignId,
+            campaignName,
+            source: "bulk",
+            send: {
+              ok: sendRes.ok,
+              skipped: false,
+              error: sendRes.ok ? null : String((sendRes as any)?.error || ""),
+            },
+          },
         })
 
         // Best-effort update extended cols with channel/external id
@@ -757,9 +796,9 @@ export async function POST(request: Request) {
     const skipped = results.filter((r) => r?.skipped).length
     const failed = results.filter((r) => !r.ok && !r?.skipped).length
 
-    if (campaignId) {
+    if (persistedCampaignId) {
       const status: BulkCampaignStatus = failed === 0 ? "completed" : sent > 0 ? "completed" : "failed"
-      await updateBulkCampaign(db, campaignId, {
+      await updateBulkCampaign(db, persistedCampaignId, {
         status,
         total,
         sent,
@@ -776,6 +815,7 @@ export async function POST(request: Request) {
       failed,
       skipped,
       results,
+      persisted: Boolean(persistedCampaignId),
     })
   } catch (error) {
     console.error("[Campaigns Send] Error:", error)

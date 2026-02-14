@@ -330,6 +330,27 @@ export default function EnviosMasivosPage() {
   }, [])
 
   useEffect(() => {
+    let cancelled = false
+    ;(async () => {
+      try {
+        const res = await fetch("/api/campaigns")
+        const data = await res.json().catch(() => null)
+        if (!res.ok) return
+        if (cancelled) return
+        const fromDb = Array.isArray(data?.campaigns) ? (data.campaigns as Campaign[]) : []
+        if (fromDb.length > 0) {
+          setCampaigns(fromDb)
+        }
+      } catch {
+        // ignore
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
     setScheduledJobs(loadScheduledJobs())
   }, [])
 
@@ -576,7 +597,7 @@ export default function EnviosMasivosPage() {
 
       const today = new Date().toISOString().slice(0, 10)
       const created: Campaign = {
-        id: String(Date.now()),
+        id: String(data?.campaignId || Date.now()),
         name,
         status: failed === 0 ? "completed" : sent > 0 ? "completed" : "failed",
         recipients: total,
@@ -619,6 +640,13 @@ export default function EnviosMasivosPage() {
         toast({ title: "Envío masivo enviado", description: `Enviados ${sent} mensajes.` })
       }
 
+      if (data?.persisted === false) {
+        toast({
+          title: "Aviso",
+          description: "No se pudo registrar la campaña en bulk_campaigns. Se guardó el tracking en messages.metadata (fallback).",
+        })
+      }
+
       // Refresh real stats (best-effort)
       try {
         const statsRes = await fetch("/api/campaigns/stats")
@@ -658,7 +686,8 @@ export default function EnviosMasivosPage() {
                     {realStats ? realStats.activeCampaigns : campaigns.filter((c) => c.status === "sending").length}
                   </p>
                 </div>
-                <Send className="h-8 w-8 text-primary opacity-50" />
+                  <p className="text-muted-foreground">Enviados</p>
+                  <p className="font-medium text-green-600">{previewCampaign.delivered}</p>
               </div>
             </CardContent>
           </Card>
@@ -1030,7 +1059,7 @@ export default function EnviosMasivosPage() {
                         </span>
                         <span className="flex items-center gap-1">
                           <CheckCircle className="h-3 w-3" />
-                          {campaign.delivered} entregados
+                          {campaign.delivered} enviados
                         </span>
                         <span className="flex items-center gap-1">
                           <Eye className="h-3 w-3" />
@@ -1272,7 +1301,7 @@ export default function EnviosMasivosPage() {
                   <p className="font-medium">{previewCampaign.recipients}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Entregados</p>
+                  <p className="text-muted-foreground">Enviados</p>
                   <p className="font-medium text-green-600">{previewCampaign.delivered}</p>
                 </div>
                 <div>

@@ -345,6 +345,35 @@ async function handleStatusUpdate(status: any) {
   if (!messageId || !state) return
 
   try {
+    // Always store last WhatsApp status in metadata for reconciliation.
+    // (Accepted by API != delivered; statuses come async via webhook.)
+    const errorText =
+      state === "failed"
+        ? String(status?.errors?.[0]?.title || status?.errors?.[0]?.message || status?.errors?.[0]?.error_data?.details || "")
+        : ""
+
+    await sql!`
+      UPDATE messages
+      SET metadata =
+        jsonb_set(
+          jsonb_set(
+            jsonb_set(
+              COALESCE(metadata, '{}'::jsonb),
+              '{whatsappStatus}',
+              to_jsonb(${state}),
+              true
+            ),
+            '{whatsappStatusAt}',
+            to_jsonb(${when.toISOString()}),
+            true
+          ),
+          '{whatsappError}',
+          to_jsonb(${errorText}),
+          true
+        )
+      WHERE external_message_id = ${messageId}
+    `
+
     if (state === "read") {
       await sql!`
         UPDATE messages
