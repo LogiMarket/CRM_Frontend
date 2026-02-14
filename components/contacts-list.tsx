@@ -29,6 +29,10 @@ import { cn, formatContactDisplayName, getContactAvatarText } from "@/lib/utils"
 import { useContacts, type Contact } from "@/hooks/use-contacts"
 import { toast } from "@/hooks/use-toast"
 
+function stripWhatsappPrefix(value: string) {
+  return String(value || "").replace(/^whatsapp:/i, "")
+}
+
 interface ContactsListProps {
   selectedId?: string
   onSelect?: (contact: Contact) => void
@@ -58,7 +62,7 @@ export function ContactsList({ selectedId, onSelect, onChat, headerRight, onDele
     setEditId(c.id)
     setEditChannel(String(c.channel || "whatsapp"))
     setEditName(String(c.name || ""))
-    setEditPhone(String(c.phone_number || ""))
+    setEditPhone(stripWhatsappPrefix(String(c.phone_number || "")))
     setEditExternal(String(c.external_user_id || ""))
     setEditOpen(true)
   }
