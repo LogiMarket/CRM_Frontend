@@ -20,6 +20,8 @@ type WhatsappTemplateSpec = {
   bodyParams?: string[]
 }
 
+type SendMode = "auto" | "text" | "template"
+
 function renderMessageTemplate(template: string, contact: any) {
   const name = String(contact?.name || "").trim()
   const phone = String(contact?.phone_number || "").trim()
@@ -419,6 +421,33 @@ async function insertOutboundMessage(db: Db, opts: { conversationId: string; use
   return messageRow
 }
 
+async function getLastInboundAt(db: Db, conversationId: string, hasExtendedDirection: boolean) {
+  try {
+    if (hasExtendedDirection) {
+      const rows: any[] = await db`
+        SELECT MAX(created_at) AS last_inbound_at
+        FROM messages
+        WHERE conversation_id::text = ${conversationId}
+          AND direction = 'inbound'
+      `
+      const v = rows?.[0]?.last_inbound_at
+      return v ? new Date(v) : null
+    }
+
+    // Fallback for older schemas: infer inbound as non-agent sender
+    const rows: any[] = await db`
+      SELECT MAX(created_at) AS last_inbound_at
+      FROM messages
+      WHERE conversation_id::text = ${conversationId}
+        AND sender_type != 'agent'
+    `
+    const v = rows?.[0]?.last_inbound_at
+    return v ? new Date(v) : null
+  } catch {
+    return null
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const user = await getSession()
@@ -441,6 +470,9 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const contactIds = Array.isArray(body?.contactIds) ? body.contactIds.map((x: any) => String(x).trim()).filter(Boolean) : []
     const messageTemplate = String(body?.message || "").trim()
+
+    const sendMode: SendMode = (String(body?.sendMode || "auto") as SendMode)
+    const skipIfOutside24h = Boolean(body?.skipIfOutside24h)
 
     const whatsappTemplate: WhatsappTemplateSpec | null = body?.whatsappTemplate
       ? {
@@ -479,10 +511,13 @@ export async function POST(request: Request) {
         const renderedContent = renderMessageTemplate(messageTemplate, ensured.contact)
 
         const shouldSendWhatsappTemplate =
+          sendMode !== "text" &&
           channel === "whatsapp" &&
           !!whatsappTemplate &&
           !!whatsappTemplate.name &&
           !!whatsappTemplate.language
+
+        const shouldSendWhatsappText = channel === "whatsapp" && (sendMode === "text" || !shouldSendWhatsappTemplate)
 
         let sendRes:
           | { ok: true; externalMessageId: string | null }
@@ -497,6 +532,24 @@ export async function POST(request: Request) {
           sendRes = await sendFacebookText(renderedContent, recipientId)
         } else {
           const phoneNumber = String((ensured.contact as any)?.phone_number || "").trim()
+
+          if (shouldSendWhatsappText && skipIfOutside24h) {
+            const lastInboundAt = await getLastInboundAt(db, conversationId, includeMessagesExtended)
+            const msSinceInbound = lastInboundAt ? Date.now() - lastInboundAt.getTime() : Number.POSITIVE_INFINITY
+            const within24h = msSinceInbound >= 0 && msSinceInbound <= 24 * 60 * 60 * 1000
+            if (!within24h) {
+              results.push({
+                contactId: contactIdText,
+                conversationId,
+                channel,
+                sendType: "text",
+                ok: false,
+                skipped: true,
+                error: "Fuera de ventana 24h: WhatsApp requiere una plantilla (template) aprobada para este envío",
+              })
+              continue
+            }
+          }
 
           if (shouldSendWhatsappTemplate) {
             const renderedBodyParams = (whatsappTemplate?.bodyParams || []).map((p) => renderMessageTemplate(p, ensured.contact))
@@ -534,7 +587,12 @@ export async function POST(request: Request) {
           channel,
           sendType: channel === "whatsapp" && shouldSendWhatsappTemplate ? "template" : "text",
           ok: sendRes.ok,
-          error: sendRes.ok ? null : sendRes.error,
+          error:
+            sendRes.ok
+              ? null
+              : /24\s*hour|24\s*h|outside\s+the\s+allowed\s+window|outside\s+customer\s+care/i.test(String(sendRes.error || ""))
+                ? `${sendRes.error} (probable ventana 24h; usa plantilla aprobada)`
+                : sendRes.error,
         })
       } catch (e) {
         results.push({ contactId: contactIdText, ok: false, error: e instanceof Error ? e.message : "Unexpected error" })

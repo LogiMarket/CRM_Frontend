@@ -117,6 +117,7 @@ type ScheduledBulkJob = {
   contactIds: string[]
   message: string
   whatsappTemplate: null | { name: string; language: string; bodyParams: string[] }
+  sendMode?: "auto" | "text"
 }
 
 const SCHEDULED_JOBS_STORAGE_KEY = "bulkScheduledJobs"
@@ -152,6 +153,7 @@ function loadScheduledJobs(): ScheduledBulkJob[] {
                 : [],
             }
           : null,
+        sendMode: String(j?.sendMode || "auto") === "text" ? "text" : "auto",
       }))
       .filter((j) => j.id && j.scheduledAt && j.contactIds.length > 0 && j.message)
   } catch {
@@ -191,6 +193,7 @@ export default function EnviosMasivosPage() {
     whatsappTemplateName: "",
     whatsappTemplateLanguage: "",
     whatsappTemplateBodyParams: "",
+    sendMode: "text" as "auto" | "text",
     scheduleDate: "",
     scheduleTime: "",
   })
@@ -321,7 +324,12 @@ export default function EnviosMasivosPage() {
       const res = await fetch("/api/campaigns/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactIds: job.contactIds, message: job.message, whatsappTemplate: job.whatsappTemplate }),
+        body: JSON.stringify({
+          contactIds: job.contactIds,
+          message: job.message,
+          whatsappTemplate: job.whatsappTemplate,
+          sendMode: job.sendMode || "auto",
+        }),
       })
 
       const data = await res.json().catch(() => null)
@@ -395,9 +403,11 @@ export default function EnviosMasivosPage() {
       .map((x) => x.trim())
       .filter(Boolean)
 
-    const whatsappTemplate = whatsappTemplateName && whatsappTemplateLanguage
-      ? { name: whatsappTemplateName, language: whatsappTemplateLanguage, bodyParams }
-      : null
+    const sendMode = newCampaign.sendMode
+    const whatsappTemplate =
+      sendMode !== "text" && whatsappTemplateName && whatsappTemplateLanguage
+        ? { name: whatsappTemplateName, language: whatsappTemplateLanguage, bodyParams }
+        : null
 
     if (mode === "schedule") {
       if (!newCampaign.scheduleDate) {
@@ -437,6 +447,7 @@ export default function EnviosMasivosPage() {
           contactIds: [...selectedContacts],
           message: messageTemplate,
           whatsappTemplate,
+          sendMode,
         },
       ])
 
@@ -448,6 +459,7 @@ export default function EnviosMasivosPage() {
         whatsappTemplateName: "",
         whatsappTemplateLanguage: "",
         whatsappTemplateBodyParams: "",
+        sendMode: "text",
         scheduleDate: "",
         scheduleTime: "",
       })
@@ -465,7 +477,7 @@ export default function EnviosMasivosPage() {
       const res = await fetch("/api/campaigns/send", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contactIds: selectedContacts, message: messageTemplate, whatsappTemplate }),
+        body: JSON.stringify({ contactIds: selectedContacts, message: messageTemplate, whatsappTemplate, sendMode }),
       })
 
       const data = await res.json().catch(() => null)
@@ -500,6 +512,7 @@ export default function EnviosMasivosPage() {
         whatsappTemplateName: "",
         whatsappTemplateLanguage: "",
         whatsappTemplateBodyParams: "",
+        sendMode: "text",
         scheduleDate: "",
         scheduleTime: "",
       })
@@ -632,12 +645,40 @@ export default function EnviosMasivosPage() {
 
                       <div className="border rounded-lg p-3 space-y-3">
                         <div className="text-sm font-medium">WhatsApp Template oficial (opcional)</div>
+
+                        <div className="flex items-center gap-2">
+                          <Checkbox
+                            checked={newCampaign.sendMode === "text"}
+                            onCheckedChange={(v) => {
+                              const asText = Boolean(v)
+                              setNewCampaign((prev) =>
+                                asText
+                                  ? {
+                                      ...prev,
+                                      sendMode: "text",
+                                      whatsappTemplateName: "",
+                                      whatsappTemplateLanguage: "",
+                                      whatsappTemplateBodyParams: "",
+                                    }
+                                  : { ...prev, sendMode: "auto" },
+                              )
+                            }}
+                          />
+                          <div>
+                            <div className="text-sm">Enviar por WhatsApp como texto (sin plantilla)</div>
+                            <div className="text-xs text-muted-foreground">
+                              Nota: fuera de la ventana de 24h WhatsApp puede rechazar texto libre.
+                            </div>
+                          </div>
+                        </div>
+
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                           <div>
                             <label className="text-xs font-medium mb-1 block">Template name</label>
                             <Input
                               placeholder="Ej: bienvenida_logimarket"
                               value={newCampaign.whatsappTemplateName}
+                              disabled={newCampaign.sendMode === "text"}
                               onChange={(e) =>
                                 setNewCampaign((prev) => ({ ...prev, whatsappTemplateName: e.target.value }))
                               }
@@ -648,6 +689,7 @@ export default function EnviosMasivosPage() {
                             <Input
                               placeholder="Ej: es_MX"
                               value={newCampaign.whatsappTemplateLanguage}
+                              disabled={newCampaign.sendMode === "text"}
                               onChange={(e) =>
                                 setNewCampaign((prev) => ({ ...prev, whatsappTemplateLanguage: e.target.value }))
                               }
@@ -660,6 +702,7 @@ export default function EnviosMasivosPage() {
                             placeholder="Ej:\n{{nombre}}"
                             rows={2}
                             value={newCampaign.whatsappTemplateBodyParams}
+                            disabled={newCampaign.sendMode === "text"}
                             onChange={(e) =>
                               setNewCampaign((prev) => ({ ...prev, whatsappTemplateBodyParams: e.target.value }))
                             }
