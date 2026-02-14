@@ -11,7 +11,22 @@ function isUuid(value: string) {
 }
 
 function normalizeWhatsappToDigits(value: string) {
-  return String(value || "").replace(/^whatsapp:/i, "").replace(/\D/g, "")
+  const digits = String(value || "").replace(/^whatsapp:/i, "").replace(/\D/g, "")
+  if (!digits) return ""
+
+  // Mexico quirks:
+  // - Old style includes an extra '1' after country code: 521XXXXXXXXXX (13 digits)
+  //   WhatsApp Cloud API expects 52 + 10-digit national number.
+  if (digits.startsWith("521") && digits.length === 13) {
+    return `52${digits.slice(-10)}`
+  }
+
+  // If user entered a 10-digit national number (very common in MX), assume Mexico (52).
+  if (digits.length === 10) {
+    return `52${digits}`
+  }
+
+  return digits
 }
 
 type WhatsappTemplateSpec = {
@@ -317,8 +332,10 @@ async function sendWhatsappText(message: string, phoneNumberRaw: string) {
   }
 
   const to = normalizeWhatsappToDigits(phoneNumberRaw)
-  if (!to) {
-    return { ok: false as const, error: "Recipient phone missing" }
+  if (!to) return { ok: false as const, error: "Recipient phone missing" }
+  // WhatsApp Cloud expects E.164 digits (no +). Typical length is 11-15.
+  if (to.length < 11 || to.length > 15) {
+    return { ok: false as const, error: `Invalid recipient phone format (${to.length} digits)` }
   }
 
   const response = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(phoneNumberId)}/messages`, {
@@ -352,8 +369,9 @@ async function sendWhatsappTemplate(template: WhatsappTemplateSpec, phoneNumberR
   }
 
   const to = normalizeWhatsappToDigits(phoneNumberRaw)
-  if (!to) {
-    return { ok: false as const, error: "Recipient phone missing" }
+  if (!to) return { ok: false as const, error: "Recipient phone missing" }
+  if (to.length < 11 || to.length > 15) {
+    return { ok: false as const, error: `Invalid recipient phone format (${to.length} digits)` }
   }
 
   const name = String(template?.name || "").trim()

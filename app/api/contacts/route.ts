@@ -23,7 +23,11 @@ async function hasContactChannelColumns(): Promise<boolean> {
 }
 
 function normalizePhoneToDigits(value: string) {
-  return String(value || "").replace(/^whatsapp:/i, "").replace(/\D/g, "")
+  const digits = String(value || "").replace(/^whatsapp:/i, "").replace(/\D/g, "")
+  if (!digits) return ""
+  if (digits.startsWith("521") && digits.length === 13) return `52${digits.slice(-10)}`
+  if (digits.length === 10) return `52${digits}`
+  return digits
 }
 
 export async function GET() {
