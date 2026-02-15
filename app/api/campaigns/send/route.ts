@@ -349,10 +349,10 @@ async function sendWhatsappText(message: string, phoneNumberRaw: string) {
   }
 
   const to = normalizeWhatsappToDigits(phoneNumberRaw)
-  if (!to) return { ok: false as const, error: "Recipient phone missing" }
+  if (!to) return { ok: false as const, error: "Recipient phone missing", to: null }
   // WhatsApp Cloud expects E.164 digits (no +). Typical length is 11-15.
   if (to.length < 11 || to.length > 15) {
-    return { ok: false as const, error: `Invalid recipient phone format (${to.length} digits)` }
+    return { ok: false as const, error: `Invalid recipient phone format (${to.length} digits)`, to }
   }
 
   const response = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(phoneNumberId)}/messages`, {
@@ -371,11 +371,11 @@ async function sendWhatsappText(message: string, phoneNumberRaw: string) {
 
   const data = await response.json().catch(() => null)
   if (!response.ok) {
-    return { ok: false as const, error: data?.error?.message || "Failed to send WhatsApp message", details: data }
+    return { ok: false as const, error: data?.error?.message || "Failed to send WhatsApp message", details: data, to }
   }
 
   const externalMessageId = String(data?.messages?.[0]?.id || "") || null
-  return { ok: true as const, externalMessageId, data }
+  return { ok: true as const, externalMessageId, data, to }
 }
 
 async function sendWhatsappTemplate(template: WhatsappTemplateSpec, phoneNumberRaw: string, renderedBodyParams: string[]) {
@@ -386,15 +386,15 @@ async function sendWhatsappTemplate(template: WhatsappTemplateSpec, phoneNumberR
   }
 
   const to = normalizeWhatsappToDigits(phoneNumberRaw)
-  if (!to) return { ok: false as const, error: "Recipient phone missing" }
+  if (!to) return { ok: false as const, error: "Recipient phone missing", to: null }
   if (to.length < 11 || to.length > 15) {
-    return { ok: false as const, error: `Invalid recipient phone format (${to.length} digits)` }
+    return { ok: false as const, error: `Invalid recipient phone format (${to.length} digits)`, to }
   }
 
   const name = String(template?.name || "").trim()
   const language = String(template?.language || "").trim()
   if (!name || !language) {
-    return { ok: false as const, error: "Template name/language missing" }
+    return { ok: false as const, error: "Template name/language missing", to }
   }
 
   const response = await fetch(`https://graph.facebook.com/v19.0/${encodeURIComponent(phoneNumberId)}/messages`, {
@@ -422,11 +422,11 @@ async function sendWhatsappTemplate(template: WhatsappTemplateSpec, phoneNumberR
 
   const data = await response.json().catch(() => null)
   if (!response.ok) {
-    return { ok: false as const, error: data?.error?.message || "Failed to send WhatsApp template", details: data }
+    return { ok: false as const, error: data?.error?.message || "Failed to send WhatsApp template", details: data, to }
   }
 
   const externalMessageId = String(data?.messages?.[0]?.id || "") || null
-  return { ok: true as const, externalMessageId, data }
+  return { ok: true as const, externalMessageId, data, to }
 }
 
 async function sendFacebookText(message: string, recipientId: string) {
@@ -791,8 +791,8 @@ export async function POST(request: Request) {
           : `Plantilla WhatsApp: ${whatsappTemplate.name} (${whatsappTemplate.language})${renderedBodyParams.length ? ` | ${renderedBodyParams.join(" | ")}` : ""}`
 
         let sendRes:
-          | { ok: true; externalMessageId: string | null }
-          | { ok: false; error: string; details?: any }
+          | { ok: true; externalMessageId: string | null; to?: string | null }
+          | { ok: false; error: string; details?: any; to?: string | null }
 
         if (channel !== "whatsapp") {
           await insertOutboundMessage(db, {
@@ -841,6 +841,7 @@ export async function POST(request: Request) {
               ok: sendRes.ok,
               skipped: false,
               externalMessageId: sendRes.ok ? sendRes.externalMessageId : null,
+              to: (sendRes as any)?.to ?? null,
               error: sendRes.ok ? null : String((sendRes as any)?.error || ""),
               details: sendRes.ok ? null : (sendRes as any)?.details ?? null,
             },
@@ -903,6 +904,7 @@ export async function POST(request: Request) {
           sendType: "template",
           ok: sendRes.ok,
           externalMessageId: sendRes.ok ? sendRes.externalMessageId : null,
+          to: (sendRes as any)?.to ?? null,
           details: sendRes.ok ? null : (sendRes as any)?.details ?? null,
           error:
             sendRes.ok
