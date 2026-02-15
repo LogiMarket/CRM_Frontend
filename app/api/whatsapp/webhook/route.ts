@@ -57,6 +57,29 @@ export async function POST(request: Request) {
 
     if (!verifyWebhookSignature(rawBody, signature)) {
       console.warn("[WhatsApp Webhook] Invalid signature")
+
+      // Optional debug: persist invalid-signature payloads to help diagnose misconfigured app secret.
+      if (process.env.DEBUG_WHATSAPP_WEBHOOK === "1") {
+        try {
+          await sql!`
+            INSERT INTO webhook_logs (channel, external_id, payload, processed, error)
+            VALUES (
+              'whatsapp_invalid_signature',
+              'unknown',
+              ${JSON.stringify({
+                signature: signature || null,
+                rawBody,
+                receivedAt: new Date().toISOString(),
+              })}::jsonb,
+              false,
+              'Invalid signature'
+            )
+          `
+        } catch (e) {
+          console.warn("[WhatsApp Webhook] Failed to persist invalid signature debug payload:", e)
+        }
+      }
+
       return NextResponse.json({ error: "Invalid signature" }, { status: 401 })
     }
 
