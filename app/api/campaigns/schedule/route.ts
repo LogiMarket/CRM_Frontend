@@ -163,7 +163,7 @@ export async function POST(request: Request) {
 
     const whatsappTemplate: WhatsappTemplateSpec | null = body?.whatsappTemplate
       ? {
-          name: String(body.whatsappTemplate?.name || "").trim(),
+          name: String(body.whatsappTemplate?.name || "").trim().toLowerCase(),
           language: normalizeTemplateLanguageCode(String(body.whatsappTemplate?.language || "")),
           bodyParams: Array.isArray(body.whatsappTemplate?.bodyParams)
             ? body.whatsappTemplate.bodyParams.map((x: any) => String(x ?? "")).filter((x: string) => x.trim().length > 0)
