@@ -53,10 +53,16 @@ export async function GET(request: Request) {
       )
     }
 
-    // Prefer direction='outbound' when available; otherwise fallback to sender_type='agent'.
-    const whereDirection = cols.has("direction")
-      ? db`direction = 'outbound'`
-      : cols.has("sender_type")
+    // Outbound messages detection varies by schema/version.
+    // If `direction` exists but isn't being populated, fall back to sender_type='agent'.
+    const hasDirection = cols.has("direction")
+    const hasSenderType = cols.has("sender_type")
+
+    const whereOutbound = hasDirection
+      ? hasSenderType
+        ? db`(direction = 'outbound' OR (direction IS NULL AND sender_type = 'agent'))`
+        : db`direction = 'outbound'`
+      : hasSenderType
         ? db`sender_type = 'agent'`
         : db`1 = 1`
 
@@ -67,7 +73,7 @@ export async function GET(request: Request) {
         COALESCE(NULLIF(metadata->>'whatsappStatus', ''), 'pending') AS status,
         COUNT(*)::int AS count
       FROM messages
-      WHERE ${whereDirection}
+      WHERE ${whereOutbound}
         AND COALESCE((metadata->>'source'), '') = 'bulk'
         ${whereCampaign}
       GROUP BY 1
@@ -91,7 +97,7 @@ export async function GET(request: Request) {
         metadata->>'whatsappError' AS whatsapp_error,
         metadata->'send'->>'externalMessageId' AS external_message_id
       FROM messages
-      WHERE ${whereDirection}
+      WHERE ${whereOutbound}
         AND COALESCE((metadata->>'source'), '') = 'bulk'
         ${whereCampaign}
       ORDER BY created_at DESC
