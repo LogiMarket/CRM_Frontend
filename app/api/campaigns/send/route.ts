@@ -11,13 +11,23 @@ function isUuid(value: string) {
 }
 
 function normalizeWhatsappToDigits(value: string) {
-  const digits = String(value || "").replace(/^whatsapp:/i, "").replace(/\D/g, "")
+  let digits = String(value || "").replace(/^whatsapp:/i, "").replace(/\D/g, "")
   if (!digits) return ""
 
-  // If user entered a 10-digit national number (common in MX), assume Mexico country code.
-  // Important: DO NOT rewrite 521... numbers; WhatsApp wa_id for MX often uses 521.
+  // Some users paste numbers in international dial format (00...), strip it.
+  digits = digits.replace(/^0+/, "")
+
+  // Mexico quirks:
+  // - Old style includes an extra '1' after country code: 52 1 XXXXXXXXXX (13 digits)
+  //   WhatsApp Cloud API expects 52 + 10-digit national number.
+  // NOTE: We normalize BOTH `521XXXXXXXXXX` and `52 1 XXXXXXXXXX` to `52XXXXXXXXXX`.
+  if (digits.length === 13 && digits.startsWith("52") && digits.slice(2, 3) === "1") {
+    digits = `52${digits.slice(-10)}`
+  }
+
+  // If user entered a 10-digit national number (very common in MX), assume Mexico (52).
   if (digits.length === 10) {
-    return `52${digits}`
+    digits = `52${digits}`
   }
 
   return digits
@@ -818,7 +828,7 @@ export async function POST(request: Request) {
           continue
         }
 
-        const phoneNumber = String((ensured.contact as any)?.phone_number || "").trim()
+          const phoneNumber = String((ensured.contact as any)?.phone_number || "").trim()
 
         sendRes = await sendWhatsappTemplate(whatsappTemplate!, phoneNumber, renderedBodyParams)
 
@@ -899,6 +909,8 @@ export async function POST(request: Request) {
           ok: sendRes.ok,
           externalMessageId: sendRes.ok ? sendRes.externalMessageId : null,
           to: (sendRes as any)?.to ?? null,
+          toSource: phoneNumber || null,
+          toNormalized: (sendRes as any)?.to ?? null,
           details: sendRes.ok ? null : (sendRes as any)?.details ?? null,
           error:
             sendRes.ok
