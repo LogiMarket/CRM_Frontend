@@ -58,6 +58,32 @@ export async function GET(request: Request) {
 
     console.log("[WhatsApp Webhook] Verification request:", { mode, token })
 
+    // Best-effort persist verification attempts so we can confirm Meta is reaching prod.
+    try {
+      if (sql) {
+        await ensureWebhookLogsTable(sql)
+        await sql!`
+          INSERT INTO webhook_logs (channel, external_id, payload, processed, error)
+          VALUES (
+            'whatsapp_verify',
+            'verify',
+            ${JSON.stringify({
+              receivedAt: new Date().toISOString(),
+              mode,
+              hasToken: Boolean(token),
+              tokenPrefix: token ? String(token).slice(0, 6) : null,
+              ok: mode === 'subscribe' && token === verifyToken,
+              hasChallenge: Boolean(challenge),
+            })}::jsonb,
+            true,
+            ${mode === 'subscribe' && token === verifyToken ? null : 'Forbidden'}
+          )
+        `
+      }
+    } catch (e) {
+      console.warn("[WhatsApp Webhook] Failed to persist verification attempt:", e)
+    }
+
     if (mode === "subscribe" && token === verifyToken) {
       console.log("[WhatsApp Webhook] Verification successful")
       return new NextResponse(challenge, { status: 200 })

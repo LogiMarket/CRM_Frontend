@@ -47,7 +47,9 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url)
     const limit = Math.min(200, Math.max(1, safeInt(searchParams.get("limit"), 50)))
     const channelRaw = String(searchParams.get("channel") || "whatsapp").trim() || "whatsapp"
-    const channel = ["whatsapp", "whatsapp_invalid_signature"].includes(channelRaw) ? channelRaw : "whatsapp"
+    const channel = ["whatsapp", "whatsapp_invalid_signature", "whatsapp_verify"].includes(channelRaw)
+      ? channelRaw
+      : "whatsapp"
 
     const db = sql
     await ensureWebhookLogsTable(db)
