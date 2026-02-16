@@ -4,6 +4,28 @@ import crypto from "crypto"
 
 export const runtime = "nodejs"
 
+type Db = NonNullable<typeof sql>
+
+async function ensureWebhookLogsTable(db: Db) {
+  try {
+    await db`
+      CREATE TABLE IF NOT EXISTS webhook_logs (
+        id SERIAL PRIMARY KEY,
+        channel VARCHAR(50) NOT NULL,
+        external_id VARCHAR(255),
+        payload JSONB,
+        processed BOOLEAN DEFAULT FALSE,
+        error TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_channel ON webhook_logs(channel)`
+    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_processed ON webhook_logs(processed)`
+  } catch {
+    // ignore
+  }
+}
+
 let _hasMessagesReadAtColumn: boolean | null = null
 let _hasMessagesExternalMessageIdColumn: boolean | null = null
 
@@ -52,6 +74,15 @@ export async function GET(request: Request) {
 // Handle incoming messages (POST request from Meta)
 export async function POST(request: Request) {
   try {
+    if (!sql) {
+      // Acknowledge so Meta doesn't keep retrying; without DB we can't reconcile.
+      await request.text().catch(() => "")
+      console.warn("[WhatsApp Webhook] DATABASE_URL missing; skipping processing")
+      return NextResponse.json({ status: "ok" }, { status: 200 })
+    }
+
+    await ensureWebhookLogsTable(sql)
+
     const rawBody = await request.text()
     const signature = request.headers.get("x-hub-signature-256")
 
@@ -64,7 +95,7 @@ export async function POST(request: Request) {
         await sql!`
           INSERT INTO webhook_logs (channel, external_id, payload, processed, error)
           VALUES (
-            'whatsapp',
+            'whatsapp_invalid_signature',
             'invalid_signature',
             ${JSON.stringify({
               receivedAt: new Date().toISOString(),
@@ -108,10 +139,14 @@ export async function POST(request: Request) {
     console.log("[WhatsApp Webhook] Received:", JSON.stringify(body, null, 2))
 
     // Log webhook for debugging
-    await sql!`
-      INSERT INTO webhook_logs (channel, external_id, payload, processed)
-      VALUES ('whatsapp', ${body.entry?.[0]?.id || "unknown"}, ${JSON.stringify(body)}, false)
-    `
+    try {
+      await sql!`
+        INSERT INTO webhook_logs (channel, external_id, payload, processed)
+        VALUES ('whatsapp', ${body.entry?.[0]?.id || "unknown"}, ${JSON.stringify(body)}, false)
+      `
+    } catch (e) {
+      console.warn("[WhatsApp Webhook] Failed to persist webhook log:", e)
+    }
 
     for (const entry of body.entry || []) {
       for (const change of entry.changes || []) {
@@ -138,14 +173,18 @@ export async function POST(request: Request) {
       }
     }
 
-    // Mark webhook as processed
-    await sql!`
-      UPDATE webhook_logs 
-      SET processed = true 
-      WHERE channel = 'whatsapp' 
-        AND external_id = ${body.entry?.[0]?.id || "unknown"}
-        AND created_at >= NOW() - INTERVAL '1 minute'
-    `
+    // Mark webhook as processed (best-effort)
+    try {
+      await sql!`
+        UPDATE webhook_logs 
+        SET processed = true 
+        WHERE channel = 'whatsapp' 
+          AND external_id = ${body.entry?.[0]?.id || "unknown"}
+          AND created_at >= NOW() - INTERVAL '1 minute'
+      `
+    } catch (e) {
+      console.warn("[WhatsApp Webhook] Failed to mark webhook as processed:", e)
+    }
 
     return NextResponse.json({ status: "ok" }, { status: 200 })
   } catch (error) {
