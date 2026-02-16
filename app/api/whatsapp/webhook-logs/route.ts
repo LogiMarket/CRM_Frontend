@@ -46,6 +46,8 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url)
     const limit = Math.min(200, Math.max(1, safeInt(searchParams.get("limit"), 50)))
+    const channelRaw = String(searchParams.get("channel") || "whatsapp").trim() || "whatsapp"
+    const channel = ["whatsapp", "whatsapp_invalid_signature"].includes(channelRaw) ? channelRaw : "whatsapp"
 
     const db = sql
     await ensureWebhookLogsTable(db)
@@ -53,7 +55,7 @@ export async function GET(request: Request) {
     const rows: any[] = await db`
       SELECT id, external_id, processed, error, created_at, payload
       FROM webhook_logs
-      WHERE channel = 'whatsapp'
+      WHERE channel = ${channel}
       ORDER BY created_at DESC
       LIMIT ${limit}
     `
@@ -91,7 +93,7 @@ export async function GET(request: Request) {
       { total: 0, withStatuses: 0, withMessages: 0, errors: 0, unprocessed: 0 },
     )
 
-    return NextResponse.json({ summary, logs: mapped })
+    return NextResponse.json({ channel, summary, logs: mapped })
   } catch (error) {
     console.error("[WhatsApp Webhook Logs] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

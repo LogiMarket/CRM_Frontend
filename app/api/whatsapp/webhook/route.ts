@@ -7,28 +7,6 @@ export const runtime = "nodejs"
 let _hasMessagesReadAtColumn: boolean | null = null
 let _hasMessagesExternalMessageIdColumn: boolean | null = null
 
-type Db = NonNullable<typeof sql>
-
-async function ensureWebhookLogsTable(db: Db) {
-  try {
-    await db`
-      CREATE TABLE IF NOT EXISTS webhook_logs (
-        id SERIAL PRIMARY KEY,
-        channel VARCHAR(50) NOT NULL,
-        external_id VARCHAR(255),
-        payload JSONB,
-        processed BOOLEAN DEFAULT FALSE,
-        error TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      )
-    `
-    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_channel ON webhook_logs(channel)`
-    await db`CREATE INDEX IF NOT EXISTS idx_webhook_logs_processed ON webhook_logs(processed)`
-  } catch {
-    // ignore
-  }
-}
-
 async function hasMessagesReadAtColumn(): Promise<boolean> {
   if (_hasMessagesReadAtColumn !== null) return _hasMessagesReadAtColumn
   try {
@@ -74,22 +52,37 @@ export async function GET(request: Request) {
 // Handle incoming messages (POST request from Meta)
 export async function POST(request: Request) {
   try {
-    if (!sql) {
-      return NextResponse.json({ error: "DATABASE_URL missing" }, { status: 500 })
-    }
-
-    await ensureWebhookLogsTable(sql)
-
     const rawBody = await request.text()
     const signature = request.headers.get("x-hub-signature-256")
 
     if (!verifyWebhookSignature(rawBody, signature)) {
       console.warn("[WhatsApp Webhook] Invalid signature")
 
+      // Record that Meta is calling us but signature validation fails.
+      // This helps distinguish "webhook not configured" vs "configured but rejected".
+      try {
+        await sql!`
+          INSERT INTO webhook_logs (channel, external_id, payload, processed, error)
+          VALUES (
+            'whatsapp',
+            'invalid_signature',
+            ${JSON.stringify({
+              receivedAt: new Date().toISOString(),
+              hasSignature: Boolean(signature),
+              signaturePrefix: signature ? String(signature).slice(0, 16) : null,
+            })}::jsonb,
+            false,
+            'Invalid signature'
+          )
+        `
+      } catch (e) {
+        console.warn("[WhatsApp Webhook] Failed to persist invalid signature marker:", e)
+      }
+
       // Optional debug: persist invalid-signature payloads to help diagnose misconfigured app secret.
       if (process.env.DEBUG_WHATSAPP_WEBHOOK === "1") {
         try {
-          await sql`
+          await sql!`
             INSERT INTO webhook_logs (channel, external_id, payload, processed, error)
             VALUES (
               'whatsapp_invalid_signature',
@@ -115,7 +108,7 @@ export async function POST(request: Request) {
     console.log("[WhatsApp Webhook] Received:", JSON.stringify(body, null, 2))
 
     // Log webhook for debugging
-    await sql`
+    await sql!`
       INSERT INTO webhook_logs (channel, external_id, payload, processed)
       VALUES ('whatsapp', ${body.entry?.[0]?.id || "unknown"}, ${JSON.stringify(body)}, false)
     `
@@ -146,7 +139,7 @@ export async function POST(request: Request) {
     }
 
     // Mark webhook as processed
-    await sql`
+    await sql!`
       UPDATE webhook_logs 
       SET processed = true 
       WHERE channel = 'whatsapp' 
@@ -159,7 +152,7 @@ export async function POST(request: Request) {
     console.error("[WhatsApp Webhook] Error processing message:", error)
 
     try {
-      await sql`
+      await sql!`
         UPDATE webhook_logs 
         SET error = ${error instanceof Error ? error.message : String(error)}, processed = false
         WHERE channel = 'whatsapp' 
