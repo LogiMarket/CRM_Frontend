@@ -14,14 +14,8 @@ function normalizeWhatsappToDigits(value: string) {
   const digits = String(value || "").replace(/^whatsapp:/i, "").replace(/\D/g, "")
   if (!digits) return ""
 
-  // Mexico quirks:
-  // - Old style includes an extra '1' after country code: 521XXXXXXXXXX (13 digits)
-  //   WhatsApp Cloud API expects 52 + 10-digit national number.
-  if (digits.startsWith("521") && digits.length === 13) {
-    return `52${digits.slice(-10)}`
-  }
-
-  // If user entered a 10-digit national number (very common in MX), assume Mexico (52).
+  // If user entered a 10-digit national number (common in MX), assume Mexico country code.
+  // Important: DO NOT rewrite 521... numbers; WhatsApp wa_id for MX often uses 521.
   if (digits.length === 10) {
     return `52${digits}`
   }
@@ -824,7 +818,7 @@ export async function POST(request: Request) {
           continue
         }
 
-          const phoneNumber = String((ensured.contact as any)?.phone_number || "").trim()
+        const phoneNumber = String((ensured.contact as any)?.phone_number || "").trim()
 
         sendRes = await sendWhatsappTemplate(whatsappTemplate!, phoneNumber, renderedBodyParams)
 

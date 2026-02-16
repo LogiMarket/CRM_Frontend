@@ -104,7 +104,36 @@ export async function GET(request: Request) {
       LIMIT 20
     `
 
-    return NextResponse.json({ campaignId, statusCounts, sample })
+    // Extra debug: if empty, show recent outbound messages and their metadata tags.
+    const isEmpty = Object.keys(statusCounts).length === 0 && (!sample || sample.length === 0)
+    let debug: any = null
+    if (isEmpty) {
+      const recentOutbound: any[] = await db`
+        SELECT
+          id,
+          created_at,
+          sender_type,
+          COALESCE(direction::text, NULL) AS direction,
+          COALESCE(metadata->>'source', NULL) AS source,
+          COALESCE(metadata->>'campaignId', NULL) AS campaign_id,
+          COALESCE(metadata->'send'->>'to', NULL) AS send_to,
+          COALESCE(metadata->'send'->>'externalMessageId', NULL) AS external_message_id
+        FROM messages
+        WHERE ${whereOutbound}
+        ORDER BY created_at DESC
+        LIMIT 25
+      `
+
+      debug = {
+        campaignId,
+        hasDirection,
+        hasSenderType,
+        note: "No se encontraron filas con metadata.source='bulk'. Revisa si el envío masivo está insertando metadata o si está apuntando a otra BD.",
+        recentOutbound,
+      }
+    }
+
+    return NextResponse.json({ campaignId, statusCounts, sample, debug })
   } catch (error) {
     console.error("[Campaign Delivery] Error:", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
