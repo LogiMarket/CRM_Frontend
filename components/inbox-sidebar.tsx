@@ -1,4 +1,23 @@
+
 "use client"
+  const isPlantillasWA = pathname.startsWith("/plantillas-wa")
+        {/* Plantillas WA - solo visible para admin y supervisor */}
+        {isAdminOrSupervisor && (
+          <Button
+            variant="ghost"
+            onClick={() => router.push("/plantillas-wa")}
+            className={cn(
+              "w-full justify-start transition-colors",
+              collapsed && "justify-center px-2",
+              isPlantillasWA
+                ? "bg-primary text-primary-foreground hover:bg-primary/90 font-medium"
+                : "text-foreground hover:bg-sidebar-accent hover:text-foreground",
+            )}
+          >
+            <MessageSquare className="h-5 w-5" />
+            {!collapsed && <span className="ml-3">Plantillas WA</span>}
+          </Button>
+        )}
 
 import { MessageSquare, Users, Settings, LogOut, Menu, X, Calendar, User, Send } from "lucide-react"
 import { Button } from "@/components/ui/button"
