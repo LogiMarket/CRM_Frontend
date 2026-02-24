@@ -201,7 +201,6 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
       {/* User Profile */}
       <div className="p-4">
         <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-          <Avatar className="h-10 w-10">
             <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(user.name)}</AvatarFallback>
           </Avatar>
           {!collapsed && (
@@ -218,11 +217,12 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
             className="mt-3 w-full justify-start text-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors"
             onClick={handleLogout}
           >
-            <LogOut className="mr-2 h-4 w-4" />
-            Cerrar sesión
-          </Button>
-        )}
-      </div>
-    </div>
+        const isPlantillasWA = false
+        const isInbox = false
+        const isContactos = false
+        const isEnvios = false
+        const isCitas = false
+        const isAgentes = false
+        const isConfiguracion = false
   )
 }
