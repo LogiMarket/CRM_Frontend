@@ -5,6 +5,9 @@ import { InboxHeader } from "@/components/inbox-header"
 import { ConversationList } from "@/components/conversation-list"
 import { ChatArea } from "@/components/chat-area"
 import { OrdersPanel } from "@/components/orders-panel"
+import dynamic from "next/dynamic"
+
+const WhatsappTemplateSender = dynamic(() => import("@/components/whatsapp-template-sender"), { ssr: false })
 
 interface ConversationData {
   id: string
@@ -164,6 +167,10 @@ export default function InboxPage() {
           </div>
           </>
         )}
+      </div>
+      {/* Panel de pruebas de plantillas WhatsApp (solo visible para pruebas) */}
+      <div className="w-full flex justify-center items-center bg-muted/30 py-8">
+        <WhatsappTemplateSender />
       </div>
     </>
   )
