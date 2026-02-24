@@ -204,7 +204,6 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
            <Avatar className="h-10 w-10">
              <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(user.name)}</AvatarFallback>
            </Avatar>
-          </Avatar>
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
               <p className="truncate font-medium text-foreground text-sm">{user.name}</p>
