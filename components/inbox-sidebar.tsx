@@ -1,5 +1,7 @@
 
+
 "use client"
+  // ...existing code...
   const isPlantillasWA = pathname.startsWith("/plantillas-wa")
         {/* Plantillas WA - solo visible para admin y supervisor */}
         {isAdminOrSupervisor && (
