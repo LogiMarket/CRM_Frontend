@@ -200,8 +200,10 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
 
       {/* User Profile */}
       <div className="p-4">
-        <div className={cn("flex items-center gap-3", collapsed && "justify-center")}>
-            <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(user.name)}</AvatarFallback>
+         <div className={cn("flex items-center gap-3", collapsed && "justify-center")}> 
+           <Avatar className="h-10 w-10">
+             <AvatarFallback className="bg-primary text-primary-foreground">{getInitials(user.name)}</AvatarFallback>
+           </Avatar>
           </Avatar>
           {!collapsed && (
             <div className="flex-1 overflow-hidden">
