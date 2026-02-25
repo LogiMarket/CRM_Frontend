@@ -218,12 +218,11 @@ export function InboxSidebar({ user }: InboxSidebarProps) {
             className="mt-3 w-full justify-start text-foreground hover:bg-sidebar-accent hover:text-foreground transition-colors"
             onClick={handleLogout}
           >
-        const isPlantillasWA = false
-        const isInbox = false
-        const isContactos = false
-        const isEnvios = false
-        const isCitas = false
-        const isAgentes = false
-        const isConfiguracion = false
+            <LogOut className="mr-2 h-4 w-4" />
+            Cerrar sesión
+          </Button>
+        )}
+      </div>
+    </div>
   )
 }
